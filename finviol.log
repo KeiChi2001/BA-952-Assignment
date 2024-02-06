@@ -1,0 +1,1618 @@
+----------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  D:\Documents\study\MSyear1\Empirical Corp Fin\Assignment 1\finviol.log
+  log type:  text
+ opened on:   6 Feb 2024, 04:48:47
+
+. 
+. 
+end of do-file
+
+. do "C:\Users\SUQIKE~1\AppData\Local\Temp\STDa184_000000.tmp"
+
+. use "Compustat_finviolation", replace
+
+. format datadate %tdDDNNCCYY // change date format
+
+. gen year=year(datadate)
+
+. gen month=month(datadate)
+
+. gen day=day(datadate)
+
+. ren (fyearq) (fyear)
+
+. 
+. preserve
+
+. use "fyr_prefstock", replace
+
+. drop if indfmt == "FS"
+(0 observations deleted)
+
+. save "fyr_prefstock", replace
+file fyr_prefstock.dta saved
+
+. restore
+
+. 
+. merge m:1 gvkey fyear using "fyr_prefstock", keepusing(fyr pstkl) keep(1 3)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       105,622
+        from master                   105,622  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                           633,214  (_merge==3)
+    -----------------------------------------
+
+. drop _m
+
+. duplicates tag fqtr fyear gvkey, gen(tag)
+
+Duplicates in terms of fqtr fyear gvkey
+
+. drop if tag==1 & mi(datafqtr)
+(594 observations deleted)
+
+. save "Compustat_finviolation", replace
+file Compustat_finviolation.dta saved
+
+. 
+. *************** Generate Financial variables **************
+. use "Compustat_finviolation", replace
+
+. drop tag
+
+. 
+. * set panel
+. destring gvkey, replace
+gvkey: all characters numeric; replaced as long
+
+. gen fqtr_n = 10*fyear+fqtr
+(5 missing values generated)
+
+. 
+. * fqtr_n cannot be identified as continuous time. Need to use the rank.
+. preserve
+
+. keep fqtr_n
+
+. duplicates drop
+
+Duplicates in terms of all variables
+
+(738,173 observations deleted)
+
+. egen q_num = rank(fqtr_n), track
+(1 missing value generated)
+
+. tempfile rank
+
+. save "`rank'"
+file C:\Users\SUQIKE~1\AppData\Local\Temp\ST_a184_000003.tmp saved as .dta format
+
+. restore
+
+. 
+. merge m:1 fqtr_n using "`rank'", nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           738,242  
+    -----------------------------------------
+
+. ren q_num rank
+
+. xtset gvkey rank
+
+Panel variable: gvkey (unbalanced)
+ Time variable: rank, 1 to 68, but with gaps
+         Delta: 1 unit
+
+. 
+. *** capital structure variables
+. * lag total asset
+. gen atql1 = L.atq
+(139,492 missing values generated)
+
+. * book debt
+. gen bdebt = dlttq + dlcq
+(160,182 missing values generated)
+
+. * net debt issuance
+. gen netdebt = (bdebt - L.bdebt)/atql1
+(209,290 missing values generated)
+
+. * net equity issuance
+. gen neteq = (sstky - prstkcy)/atql1
+(257,485 missing values generated)
+
+. * book debt - assets ratio
+. gen bdat = bdebt/atq
+(162,092 missing values generated)
+
+. 
+. * Covenant control variables
+. * net worth-assets ratio
+. gen nworth = atq-ltq
+(119,848 missing values generated)
+
+. gen nwat = nworth/atq
+(121,736 missing values generated)
+
+. * net working capital-assets ratio
+. gen nwc = actq - lctq
+(228,478 missing values generated)
+
+. gen nwcat = nwc/atq
+(230,397 missing values generated)
+
+. * cash-assets ratio
+. gen cashat = cheq/atq
+(127,103 missing values generated)
+
+. * EBITDA-lag assets ratio
+. gen ebitda = oibdpq/atql1
+(220,300 missing values generated)
+
+. * Cash flow-lag assets ratio
+. gen cf = ibq+dpq
+(176,152 missing values generated)
+
+. gen cfat = cf/atql1
+(226,297 missing values generated)
+
+. * net income-lag assets ratio
+. gen niat = niq/atql1
+(151,688 missing values generated)
+
+. * interest expense-lag assets ratio
+. gen intat = xintq/atql1
+(292,499 missing values generated)
+
+. 
+. *** Other controls
+. * market-to-book
+. gen mv = prccq*cshoq
+(164,119 missing values generated)
+
+. gen bv = actq - lctq - pstkl + txditcq
+(324,585 missing values generated)
+
+. gen mbr = mv/bv
+(387,746 missing values generated)
+
+. * tangible asset ratio
+. gen tatr = ppentq/atq
+(139,567 missing values generated)
+
+. * ln assets
+. gen lnat = ln(atq)
+(120,704 missing values generated)
+
+. 
+. * generate lags
+. foreach v in netdebt neteq bdat nwat nwcat cashat ebitda cfat niat intat mbr tatr lnat{
+  2.         gen `v'l1 = L.`v'
+  3. }
+(226,976 missing values generated)
+(274,038 missing values generated)
+(181,526 missing values generated)
+(142,164 missing values generated)
+(247,345 missing values generated)
+(147,471 missing values generated)
+(237,618 missing values generated)
+(243,374 missing values generated)
+(171,181 missing values generated)
+(307,462 missing values generated)
+(388,539 missing values generated)
+(159,548 missing values generated)
+(141,303 missing values generated)
+
+. 
+. foreach v in saleq ppentq ltq nworth cheq nwc oibdpq cf niq xintq bv mv{
+  2.         gen `v'l1 = L.`v'
+  3. }
+(106,600 missing values generated)
+(157,567 missing values generated)
+(140,307 missing values generated)
+(140,357 missing values generated)
+(145,516 missing values generated)
+(245,510 missing values generated)
+(188,105 missing values generated)
+(194,395 missing values generated)
+(105,711 missing values generated)
+(260,533 missing values generated)
+(325,558 missing values generated)
+(182,916 missing values generated)
+
+. 
+. duplicates drop gvkey fqtr fyear, force
+
+Duplicates in terms of gvkey fqtr fyear
+
+(3 observations deleted)
+
+. save "Compustat_finviolation", replace
+file Compustat_finviolation.dta saved
+
+. 
+. 
+. ***********************  Merge violation with Compustat  ***********************
+. *** since the datadate in financial convenant violation is calendar date, I want to convert it into fiscal year and quarter.
+. use "financial convenant violation", replace
+
+. 
+. * generate time variables
+. gen year=substr(datadate,5,4)
+
+. gen month=substr(datadate,1,2)
+
+. gen day=substr(datadate,3,2)
+
+. destring year month day, replace
+year: all characters numeric; replaced as int
+month: all characters numeric; replaced as byte
+day: all characters numeric; replaced as byte
+
+. 
+. /*
+> * gvkey format
+> gen gvkey_str = string(gvkey, "%06.0f")
+> drop gvkey
+> ren gvkey_str gvkey
+> */
+. 
+. * merge with compustat to get fiscal year-quarter
+. merge 1:m year month day gvkey using "Compustat_finviolation", keepusing(datafqtr fyr fyear) keep(1 3) 
+(variable year was int, now float to accommodate using data's values)
+(variable month was byte, now float to accommodate using data's values)
+(variable day was byte, now float to accommodate using data's values)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                           550
+        from master                       550  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                           262,213  (_merge==3)
+    -----------------------------------------
+
+. gen fqtr = substr(datafqtr, 6, 1)
+(550 missing values generated)
+
+. destring fqtr, replace
+fqtr: all characters numeric; replaced as byte
+(550 missing values generated)
+
+. drop _m
+
+. save "financial convenant violation_f", replace
+file financial convenant violation_f.dta saved
+
+. 
+. 
+. *** Merge with Compustat
+. use "financial convenant violation_f", replace
+
+. keep if fyear<=2006
+(17,967 observations deleted)
+
+. drop if missing(datafqtr)
+(0 observations deleted)
+
+. merge 1:1 gvkey fqtr fyear using "Compustat_finviolation", keep(1 3) force
+(note: variable datadate was long in the using data, but will be str8 now)
+(variable fqtr was byte, now double to accommodate using data's values)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           244,796  (_merge==3)
+    -----------------------------------------
+
+. drop if fyear>=2006
+(19,000 observations deleted)
+
+. 
+. *** restrict the sample with nonmissing data for both thecontemporaneous and lagged value of financial variables
+. xtset gvkey rank
+
+Panel variable: gvkey (unbalanced)
+ Time variable: rank, 19 to 58, but with gaps
+         Delta: 1 unit
+
+. 
+. foreach v in saleq ppentq ltq nworth cheq nwc oibdpq cf niq xintq bv mv mbr atq{
+  2.         keep if !mi(`v') & !mi(`v'l1)
+  3. }
+(1,419 observations deleted)
+(1,337 observations deleted)
+(27 observations deleted)
+(0 observations deleted)
+(122 observations deleted)
+(5,037 observations deleted)
+(23,744 observations deleted)
+(160 observations deleted)
+(2 observations deleted)
+(38,129 observations deleted)
+(16,642 observations deleted)
+(1,984 observations deleted)
+(138 observations deleted)
+(0 observations deleted)
+
+. 
+end of do-file
+
+. do "C:\Users\SUQIKE~1\AppData\Local\Temp\STDa184_000000.tmp"
+
+. *** drop the firms without at least four consecutive quarters of records
+. * Generate a variable indicating the consecutive status for each firm-quarter
+. sort gvkey rank
+
+. bysort gvkey: gen consec = (rank == rank[_n-1]+1)
+
+. bysort gvkey: replace consec = 1 if _n==1
+(8,169 real changes made)
+
+. bysort gvkey: gen drop_tag = 1 if consec == 0 & (consec[_n-1]==0 | consec[_n-2]==0 | consec[_n-3]==0 | consec[_n-4]==0 | consec[
+> _n+1]==0 | consec[_n+2]==0 | consec[_n+3]==0 | consec[_n+4]==0)
+(135,705 missing values generated)
+
+. * Keep only the observations where consec_count is at least 4
+. drop if drop_tag==1
+(1,350 observations deleted)
+
+. 
+. 
+. * winsorize the variables
+. foreach v in netdebtl1 neteql1 bdatl1 nwatl1 nwcatl1 cashatl1 ebitdal1 cfatl1 niatl1 intatl1 mbrl1 tatrl1 lnatl1{
+  2.         winsor `v', gen(`v'W) p(0.05)
+  3. }
+
+. 
+. * change into basis point
+. replace netdebt = 10000*netdebt
+(111,138 real changes made)
+
+. replace neteq = 10000*neteq
+(85,965 real changes made)
+
+. replace netdebtl1W = 10000*netdebtl1W
+(110,513 real changes made)
+
+. replace neteql1W = 10000*neteql1W
+(84,429 real changes made)
+
+. 
+. replace neteql1W = 0 if mi(neteql1W)
+(17,199 real changes made)
+
+. replace netdebtl1W = 0 if mi(netdebtl1W)
+(3,314 real changes made)
+
+. 
+. tabstat netdebtl1W neteql1W bdatl1W nwatl1W nwcatl1W cashatl1W ebitdal1W cfatl1W niatl1W intatl1W mbrl1W tatrl1W lnatl1W, s(mean
+>  p50 sd) col(stat) f(%7.3f)
+
+    Variable |      Mean       p50        SD
+-------------+------------------------------
+  netdebtl1W |    80.396     0.000   515.923
+    neteql1W |   352.838     0.000  1115.163
+     bdatl1W |     0.275     0.238     0.247
+     nwatl1W |     0.430     0.470     0.355
+    nwcatl1W |     0.196     0.190     0.321
+   cashatl1W |     0.175     0.064     0.227
+   ebitdal1W |    -0.004     0.023     0.084
+     cfatl1W |    -0.018     0.015     0.093
+     niatl1W |    -0.034     0.004     0.099
+    intatl1W |     0.007     0.004     0.007
+      mbrl1W |     4.064     2.752    10.586
+     tatrl1W |     0.289     0.215     0.240
+     lnatl1W |     4.523     4.556     2.285
+--------------------------------------------
+
+. 
+. *** Table II
+. eststo clear
+
+. estpost sum netdebtl1W neteql1W bdatl1W nwatl1W nwcatl1W cashatl1W ebitdal1W cfatl1W niatl1W intatl1W mbrl1W tatrl1W lnatl1W, d
+
+             |  e(count)   e(sum_w)    e(mean)     e(Var)      e(sd)  e(skewn~)  e(kurto~)     e(sum)     e(min)     e(max) 
+-------------+--------------------------------------------------------------------------------------------------------------
+  netdebtl1W |    135705     135705   80.39593   266176.5    515.923   1.277569   5.552809   1.09e+07  -863.9493   1616.191 
+    neteql1W |    135705     135705   352.8376    1243589   1115.163   3.212667   12.13077   4.79e+07   -298.416   4714.812 
+     bdatl1W |    133695     133695   .2753386   .0610481   .2470791   .8302741   2.960352   36811.39          0    .878113 
+     nwatl1W |    135323     135323   .4300788   .1260089   .3549773  -1.143388   4.336254   58199.56  -.5710591   .9047329 
+    nwcatl1W |    135323     135323    .195999    .102732   .3205184  -.3958763     3.1742   26523.17  -.5850038   .7559478 
+   cashatl1W |    135323     135323   .1751781   .0513465   .2265977   1.477404   3.988091   23705.63   .0016418   .7692823 
+   ebitdal1W |    134516     134516  -.0041409   .0071043   .0842868  -1.864217    5.89106  -557.0183  -.2631579   .0838049 
+     cfatl1W |    134516     134516  -.0183095   .0086981   .0932638  -2.100256   6.662434  -2462.916  -.3160494   .0659191 
+     niatl1W |    134516     134516   -.034183   .0097313   .0986476  -2.126272   6.722696  -4598.161  -.3499102   .0509451 
+    intatl1W |    134516     134516   .0065514   .0000545   .0073806   1.599939   5.001489   881.2738          0   .0282297 
+      mbrl1W |    135705     135705   4.064247    112.058   10.58575   .5035816   4.728015   551538.6  -19.79835    32.0066 
+     tatrl1W |    135323     135323   .2889094   .0577416   .2402949   .8023377   2.461828   39096.09   .0165805   .8060856 
+     lnatl1W |    135323     135323    4.52318   5.218953   2.284503  -.0618359   2.201258   612090.3   .2311117   8.589299 
+
+             |     e(p1)      e(p5)     e(p10)     e(p25)     e(p50)     e(p75)     e(p90)     e(p95)     e(p99) 
+-------------+---------------------------------------------------------------------------------------------------
+  netdebtl1W | -863.9493  -843.5087  -410.9748  -92.03174          0   133.5573   701.9138   1566.148   1616.191 
+    neteql1W |  -298.416  -253.5162  -66.71983          0          0   48.67802   911.5326   3961.655   4714.812 
+     bdatl1W |         0          0          0   .0495025   .2375395   .4166597   .6297484    .878113    .878113 
+     nwatl1W | -.5710591  -.5710591    .019305   .2815265   .4695293   .6839473   .8432356   .9047329   .9047329 
+    nwcatl1W | -.5850038  -.5850038  -.1536387   .0130622   .1898262   .4121544   .6339573   .7559478   .7559478 
+   cashatl1W |  .0016418   .0016418   .0046258   .0163145   .0644286    .249073   .5781005   .7692823   .7692823 
+   ebitdal1W | -.2631579  -.2631579  -.1237582   -.015219   .0233277   .0438378   .0657877   .0838049   .0838049 
+     cfatl1W | -.3160494  -.3160494  -.1465779   -.021582   .0152616    .031449   .0496466   .0659191   .0659191 
+     niatl1W | -.3499102  -.3499102  -.1703288  -.0377551   .0038691   .0179986   .0347168   .0509451   .0509451 
+    intatl1W |         0          0          0   .0009731   .0043456   .0088513   .0169097   .0282297   .0282297 
+      mbrl1W | -19.79835  -19.79835  -5.803785   .5558153   2.751843   6.901816   16.72344    32.0066    32.0066 
+     tatrl1W |  .0165805   .0165805   .0349073   .0876402    .215157   .4436916     .69721   .8060856   .8060856 
+     lnatl1W |  .2311117   .2311117   1.361233   2.849492   4.555591   6.237772   7.675839   8.589299   8.589299 
+
+. eststo
+(est1 stored)
+
+. 
+. label var netdebtl1W "Net debt issuance (basis points)"
+
+. label var neteql1W "Net equity issuance (basis points)"
+
+. label var bdatl1W "Book debt$_t$/assets$_t$"
+
+. label var nwatl1W "Net worth$_t$/assets$_t$"
+
+. label var nwcatl1W "Net working capital$_t$/assets$_t$"
+
+. label var cashatl1W "Cash$_t$/assets$_t$"
+
+. label var ebitdal1W "EBITDA$_t$/assets$_{t-1}$"
+
+. label var cfatl1W "Cash flow$_t$/assets$_{t-1}$"
+
+. label var niatl1W "Net income$_t$/assets$_{t-1}$"
+
+. label var intatl1W "Interest expense$_t$/assets$_{t-1}$"
+
+. label var mbrl1W "Market-to-book ratio$_t$"
+
+. label var tatrl1W "Tangibble assets$_t$/assets$_t$"
+
+. label var lnatl1W "Ln(assets$_t$)"
+
+. 
+. 
+. esttab * using "financial_viol_table2.tex", ///
+>         cells("mean(fmt(%9.3fc)) sd(fmt(%9.3fc)) p50(fmt(%9.3fc))") nonumber ///
+>         replace nomtitle nonote noobs label collabels("Mean" "SD" "Median")
+(output written to financial_viol_table2.tex)
+
+. 
+. 
+. 
+. * prepare for 'Has S&P ratings' 
+. preserve
+
+. use "Compustat_finviolation", replace
+
+. destring gvkey, replace
+gvkey already numeric; no replace
+
+. keep gvkey fyr
+
+. duplicates drop gvkey, force
+
+Duplicates in terms of gvkey
+
+(714,916 observations deleted)
+
+. duplicates report gvkey
+
+Duplicates in terms of gvkey
+
+--------------------------------------
+   Copies | Observations       Surplus
+----------+---------------------------
+        1 |        23323             0
+--------------------------------------
+
+. tempfile fyr
+
+. save "`fyr'"
+file C:\Users\SUQIKE~1\AppData\Local\Temp\ST_a184_000002.tmp saved as .dta format
+
+. restore
+
+. 
+. preserve
+
+. use "ratings", replace
+
+. gen HasRatingmonth = (!mi(splticrm) | !mi(spsdrm) | !mi(spsticrm))
+
+. *** there is no fiscal quarter and fiscal year in ratings, so I need to infer these using the datadate
+. gen year=year(datadate)
+
+. gen month=month(datadate)
+
+. gen day=day(datadate)
+
+. destring gvkey, replace
+gvkey: all characters numeric; replaced as long
+
+. merge m:1 gvkey using "`fyr'", keep(1 3)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                         8,897
+        from master                     8,897  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                         1,451,169  (_merge==3)
+    -----------------------------------------
+
+. 
+. gen fqtr = 1
+
+. replace fqtr = 2 if (month<fyr & 4 <= month+12-fyr <= 6) | (month>fyr & 4 <= month-fyr <= 6)
+(1,409,862 real changes made)
+
+. replace fqtr = 3 if (month<fyr & 7 <= month+12-fyr <= 9) | (month>fyr & 7 <= month-fyr <= 9)
+(1,409,862 real changes made)
+
+. replace fqtr = 4 if (month<fyr & 10 <= month+12-fyr < 12) | (month==fyr)
+(50,204 real changes made)
+
+. gen fyear=.
+(1,460,066 missing values generated)
+
+. replace fyear = year if month>fyr
+(104,297 real changes made)
+
+. replace fyear = year-1 if month<=fyr
+(1,355,769 real changes made)
+
+. 
+. bys gvkey fyear fqtr: egen HasRating = max(HasRatingmonth)
+
+. 
+. drop if mi(fyr)
+(883,806 observations deleted)
+
+. keep gvkey fyear fqtr HasRating
+
+. duplicates drop gvkey fyear fqtr, force
+
+Duplicates in terms of gvkey fyear fqtr
+
+(471,563 observations deleted)
+
+. tempfile ratings
+
+. save "`ratings'"
+file C:\Users\SUQIKE~1\AppData\Local\Temp\ST_a184_000004.tmp saved as .dta format
+
+. restore
+
+. 
+. drop _m
+
+. merge m:1 gvkey fyear fqtr using "`ratings'", keep(1 3) force
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       108,686
+        from master                   108,686  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                            27,019  (_merge==3)
+    -----------------------------------------
+
+. replace HasRating=0 if mi(HasRating)
+(108,686 real changes made)
+
+. 
+. 
+end of do-file
+
+. do "C:\Users\SUQIKE~1\AppData\Local\Temp\STDa184_000000.tmp"
+
+. ******** Table III
+. xtset gvkey rank
+
+Panel variable: gvkey (unbalanced)
+ Time variable: rank, 19 to 58, but with gaps
+         Delta: 1 unit
+
+. * generate calendar quarter
+. gen cqtr=.
+(135,705 missing values generated)
+
+. replace cqtr = 10*year+1 if 1 <= month & month <= 3
+(30,032 real changes made)
+
+. replace cqtr = 10*year+2 if 4 <= month & month <= 6
+(34,667 real changes made)
+
+. replace cqtr = 10*year+3 if 7 <= month & month <= 9
+(35,680 real changes made)
+
+. replace cqtr = 10*year+4 if 10 <= month & month <= 12
+(35,326 real changes made)
+
+. winsor netdebt, gen(netdebtW) p(0.05)
+
+. 
+. *** Panel A
+. * Col 1
+. eststo clear
+
+. reghdfe netdebtW viol L.viol, vce(cluster gvkey) absorb(rank cqtr)
+(MWFE estimator converged in 27 iterations)
+
+HDFE Linear regression                            Number of obs   =    121,190
+Absorbing 2 HDFE groups                           F(   2,   7866) =      75.87
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.0077
+                                                  Adj R-squared   =     0.0071
+                                                  Within R-sq.    =     0.0015
+Number of clusters (gvkey)   =      7,867         Root MSE        =   505.5962
+
+                              (Std. err. adjusted for 7,867 clusters in gvkey)
+------------------------------------------------------------------------------
+             |               Robust
+    netdebtW | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        viol |
+         --. |   29.56447   7.384913     4.00   0.000     15.08808    44.04087
+         L1. |  -90.49733   7.376949   -12.27   0.000    -104.9581   -76.03655
+             |
+       _cons |   82.40745   2.113052    39.00   0.000     78.26531     86.5496
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+        rank |        39           0          39     |
+        cqtr |        40           1          39     |
+-----------------------------------------------------+
+
+. estadd local Covenant_Control_Variables "None"
+
+added macro:
+e(Covenant_Control_Variables) : "None"
+
+. eststo
+(est1 stored)
+
+. 
+. * Col 2
+. reghdfe netdebtW viol L.viol L.HasRating lnatl1W tatrl1W mbrl1W bdatl1W nwatl1W cashatl1W ebitda ebitdal1W cfat cfatl1W niat nia
+> tl1W intat intatl1W, vce(cluster gvkey) absorb(rank cqtr)
+(MWFE estimator converged in 27 iterations)
+
+HDFE Linear regression                            Number of obs   =    121,085
+Absorbing 2 HDFE groups                           F(  17,   7863) =      80.26
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.0399
+                                                  Adj R-squared   =     0.0391
+                                                  Within R-sq.    =     0.0338
+Number of clusters (gvkey)   =      7,864         Root MSE        =   496.8435
+
+                              (Std. err. adjusted for 7,864 clusters in gvkey)
+------------------------------------------------------------------------------
+             |               Robust
+    netdebtW | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        viol |
+         --. |   19.64254   7.328791     2.68   0.007      5.27616    34.00891
+         L1. |   -108.099   7.391213   -14.63   0.000    -122.5878   -93.61028
+             |
+   HasRating |
+         L1. |   101.9024   11.85326     8.60   0.000     78.66686    125.1379
+             |
+     lnatl1W |  -3.208032   .9626714    -3.33   0.001    -5.095124   -1.320941
+     tatrl1W |   81.34452   9.432659     8.62   0.000       62.854    99.83504
+      mbrl1W |   .4846034    .173851     2.79   0.005     .1438093    .8253976
+     bdatl1W |  -226.1401   18.15004   -12.46   0.000     -261.719   -190.5612
+     nwatl1W |  -63.03874   10.13478    -6.22   0.000     -82.9056   -43.17188
+   cashatl1W |  -181.9075   10.39653   -17.50   0.000    -202.2874   -161.5275
+      ebitda |   1.583604   1.110889     1.43   0.154    -.5940339    3.761241
+   ebitdal1W |  -754.9421   65.47366   -11.53   0.000    -883.2879   -626.5964
+        cfat |  -.0138896   1.098876    -0.01   0.990    -2.167978    2.140199
+     cfatl1W |  -50.88394   118.8691    -0.43   0.669     -283.899    182.1311
+        niat |  -1.747915   .3354689    -5.21   0.000    -2.405523   -1.090307
+     niatl1W |  -60.38611   100.4311    -0.60   0.548    -257.2578    136.4855
+       intat |   13.39045   5.905969     2.27   0.023     1.813183    24.96772
+    intatl1W |   5809.959   583.6331     9.95   0.000     4665.883    6954.035
+       _cons |   146.8755    9.53695    15.40   0.000     128.1805    165.5705
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+        rank |        39           0          39     |
+        cqtr |        40           1          39     |
+-----------------------------------------------------+
+
+. estadd local Covenant_Control_Variables "Covenant control variables"
+
+added macro:
+e(Covenant_Control_Variables) : "Covenant control variables"
+
+. eststo
+(est2 stored)
+
+. 
+. 
+. * Col 3
+. gen bdatl1W_cfatl1W = bdatl1W*cfatl1W
+(2,903 missing values generated)
+
+. gen bdatl1W_ebitdal1W = bdatl1W*ebitdal1W
+(2,903 missing values generated)
+
+. gen bdatl1W_nwatl1W = bdatl1W*nwatl1W
+(2,010 missing values generated)
+
+. gen ebitdal1W_intatl1W = ebitdal1W*intatl1W
+(1,189 missing values generated)
+
+. 
+. reghdfe netdebtW viol L.viol L.HasRating lnatl1W tatrl1W mbrl1W bdatl1W nwatl1W cashatl1W ebitda ebitdal1W cfat cfatl1W niat nia
+> tl1W intat intatl1W bdatl1W_cfatl1W bdatl1W_ebitdal1W bdatl1W_nwatl1W ebitdal1W_intatl1W, vce(cluster gvkey) absorb(rank cqtr)
+(MWFE estimator converged in 27 iterations)
+
+HDFE Linear regression                            Number of obs   =    121,085
+Absorbing 2 HDFE groups                           F(  21,   7863) =      77.59
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.0492
+                                                  Adj R-squared   =     0.0484
+                                                  Within R-sq.    =     0.0432
+Number of clusters (gvkey)   =      7,864         Root MSE        =   494.4303
+
+                                    (Std. err. adjusted for 7,864 clusters in gvkey)
+------------------------------------------------------------------------------------
+                   |               Robust
+          netdebtW | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------------+----------------------------------------------------------------
+              viol |
+               --. |    28.8474   7.244087     3.98   0.000     14.64706    43.04773
+               L1. |  -98.92477   7.293413   -13.56   0.000    -113.2218   -84.62774
+                   |
+         HasRating |
+               L1. |   118.3382   11.99213     9.87   0.000     94.83046     141.846
+                   |
+           lnatl1W |   .4591955   .9654151     0.48   0.634    -1.433275    2.351666
+           tatrl1W |   99.11891   9.614808    10.31   0.000     80.27133    117.9665
+            mbrl1W |   .6382187   .1719575     3.71   0.000     .3011363    .9753011
+           bdatl1W |  -266.5423   19.66178   -13.56   0.000    -305.0846        -228
+           nwatl1W |  -9.282285   9.713375    -0.96   0.339    -28.32308     9.75851
+         cashatl1W |  -191.7668   10.67872   -17.96   0.000    -212.6999   -170.8337
+            ebitda |   1.775739   1.066518     1.66   0.096    -.3149191    3.866398
+         ebitdal1W |  -420.8723   68.95758    -6.10   0.000    -556.0475   -285.6972
+              cfat |  -.0335569   1.088852    -0.03   0.975    -2.167997    2.100883
+           cfatl1W |   72.44891   121.0608     0.60   0.550    -164.8625    309.7603
+              niat |  -1.953779   .4074258    -4.80   0.000    -2.752442   -1.155116
+           niatl1W |   -51.3322    101.387    -0.51   0.613    -250.0777    147.4133
+             intat |   8.635866   5.181778     1.67   0.096    -1.521796    18.79353
+          intatl1W |   5968.567   623.5394     9.57   0.000     4746.264     7190.87
+   bdatl1W_cfatl1W |  -230.0914   191.3432    -1.20   0.229     -605.175    144.9921
+ bdatl1W_ebitdal1W |  -1427.795   250.6384    -5.70   0.000    -1919.113   -936.4769
+   bdatl1W_nwatl1W |  -134.7778   25.78987    -5.23   0.000    -185.3328   -84.22277
+ebitdal1W_intatl1W |   3671.841   4751.292     0.77   0.440    -5641.953    12985.64
+             _cons |   117.2971   8.933142    13.13   0.000     99.78575    134.8084
+------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+        rank |        39           0          39     |
+        cqtr |        40           1          39     |
+-----------------------------------------------------+
+
+. estadd local Covenant_Control_Variables "Covenant control variables, Covenant interaction control variables"
+
+added macro:
+e(Covenant_Control_Variables) : "Covenant control variables, Covenant interaction control variables"
+
+. eststo
+(est3 stored)
+
+. 
+. 
+. * Col 4
+. foreach v in bdatl1W nwatl1W cashatl1W ebitda ebitdal1W cfat cfatl1W niat niatl1W intat intatl1W bdatl1W_cfatl1W bdatl1W_ebitdal
+> 1W bdatl1W_nwatl1W ebitdal1W_intatl1W{
+  2.         gen `v'_sq = `v'^2
+  3.         gen `v'_cb = `v'^3
+  4.         egen `v'_tile = xtile(`v'), nq(5)
+  5. }
+(2,010 missing values generated)
+(2,010 missing values generated)
+(2,010 missing values generated)
+(382 missing values generated)
+(382 missing values generated)
+(382 missing values generated)
+(382 missing values generated)
+(382 missing values generated)
+(382 missing values generated)
+(382 missing values generated)
+(382 missing values generated)
+(382 missing values generated)
+(1,189 missing values generated)
+(1,189 missing values generated)
+(1,189 missing values generated)
+(382 missing values generated)
+(382 missing values generated)
+(382 missing values generated)
+(1,189 missing values generated)
+(1,189 missing values generated)
+(1,189 missing values generated)
+(382 missing values generated)
+(382 missing values generated)
+(382 missing values generated)
+(1,189 missing values generated)
+(1,189 missing values generated)
+(1,189 missing values generated)
+(382 missing values generated)
+(382 missing values generated)
+(382 missing values generated)
+(1,189 missing values generated)
+(1,189 missing values generated)
+(1,189 missing values generated)
+(2,903 missing values generated)
+(2,903 missing values generated)
+(2,903 missing values generated)
+(2,903 missing values generated)
+(2,903 missing values generated)
+(2,903 missing values generated)
+(2,010 missing values generated)
+(2,010 missing values generated)
+(2,010 missing values generated)
+(1,189 missing values generated)
+(1,189 missing values generated)
+(1,189 missing values generated)
+
+. 
+. reghdfe netdebtW viol L.viol L.HasRating lnatl1W tatrl1W mbrl1W bdatl1W nwatl1W cashatl1W ebitda ebitdal1W cfat cfatl1W niat nia
+> tl1W intat intatl1W bdatl1W_cfatl1W bdatl1W_ebitdal1W bdatl1W_nwatl1W ebitdal1W_intatl1W *_sq *_cb i.*_tile, vce(cluster gvkey) 
+> absorb(rank cqtr)
+(MWFE estimator converged in 28 iterations)
+
+HDFE Linear regression                            Number of obs   =    121,085
+Absorbing 2 HDFE groups                           F( 111,   7863) =      90.43
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.1227
+                                                  Adj R-squared   =     0.1213
+                                                  Within R-sq.    =     0.1171
+Number of clusters (gvkey)   =      7,864         Root MSE        =   475.1244
+
+                                         (Std. err. adjusted for 7,864 clusters in gvkey)
+-----------------------------------------------------------------------------------------
+                        |               Robust
+               netdebtW | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------------+----------------------------------------------------------------
+                   viol |
+                    --. |      12.36   7.209479     1.71   0.086    -1.772498    26.49249
+                    L1. |  -90.81823   7.196723   -12.62   0.000    -104.9257   -76.71074
+                        |
+              HasRating |
+                    L1. |   94.84569   11.12009     8.53   0.000     73.04736     116.644
+                        |
+                lnatl1W |   5.487603   1.017453     5.39   0.000     3.493125    7.482082
+                tatrl1W |   79.84724   9.767796     8.17   0.000     60.69977    98.99472
+                 mbrl1W |   .7488012   .1679675     4.46   0.000     .4195404    1.078062
+                bdatl1W |  -1311.338   159.6738    -8.21   0.000    -1624.341   -998.3349
+                nwatl1W |  -22.62675   36.62806    -0.62   0.537    -94.42749    49.17398
+              cashatl1W |   -270.963   133.8057    -2.03   0.043    -533.2577    -8.66829
+                 ebitda |  -3.041285   1.622975    -1.87   0.061    -6.222748    .1401787
+              ebitdal1W |   344.3335   164.4007     2.09   0.036     22.06452    666.6026
+                   cfat |    5.99646   4.229975     1.42   0.156    -2.295415    14.28833
+                cfatl1W |   -784.082   224.1012    -3.50   0.000     -1223.38   -344.7841
+                   niat |  -6.606597   3.842586    -1.72   0.086    -14.13909    .9258927
+                niatl1W |   298.7582   227.9025     1.31   0.190    -147.9912    745.5076
+                  intat |   15.25247   19.34565     0.79   0.430    -22.67015    53.17508
+               intatl1W |  -37750.65   4628.835    -8.16   0.000     -46824.4   -28676.91
+        bdatl1W_cfatl1W |   240.2899   385.1691     0.62   0.533    -514.7439    995.3237
+      bdatl1W_ebitdal1W |  -1742.063   458.7178    -3.80   0.000    -2641.272   -842.8544
+        bdatl1W_nwatl1W |   207.0285   95.82167     2.16   0.031      19.1926    394.8645
+     ebitdal1W_intatl1W |  -27499.11   11188.24    -2.46   0.014    -49431.04   -5567.184
+             bdatl1W_sq |    1016.64   403.5447     2.52   0.012     225.5853    1807.695
+             nwatl1W_sq |   74.05843   58.90784     1.26   0.209     -41.4166    189.5335
+           cashatl1W_sq |   567.4281   358.7857     1.58   0.114    -135.8873    1270.744
+              ebitda_sq |  -.0048236   .0026354    -1.83   0.067    -.0099896    .0003424
+           ebitdal1W_sq |   3656.681   1362.181     2.68   0.007     986.4438    6326.918
+                cfat_sq |   -.013825   .0094231    -1.47   0.142    -.0322967    .0046467
+             cfatl1W_sq |  -6630.386   2157.098    -3.07   0.002    -10858.87   -2401.902
+                niat_sq |   .0125637   .0090399     1.39   0.165    -.0051568    .0302843
+             niatl1W_sq |   5.951451   1964.318     0.00   0.998    -3844.633    3856.536
+               intat_sq |  -.3937467   .4768342    -0.83   0.409    -1.328468    .5409751
+            intatl1W_sq |    1679584   367743.6     4.57   0.000     958708.4     2400459
+     bdatl1W_cfatl1W_sq |   -708.883   4645.991    -0.15   0.879    -9816.259    8398.493
+   bdatl1W_ebitdal1W_sq |  -9339.641   6158.886    -1.52   0.129    -21412.69    2733.412
+     bdatl1W_nwatl1W_sq |   1423.469   324.6805     4.38   0.000     787.0084    2059.929
+  ebitdal1W_intatl1W_sq |    3228113    4864564     0.66   0.507     -6307725    1.28e+07
+             bdatl1W_cb |  -85.52009   302.1971    -0.28   0.777    -677.9068    506.8666
+             nwatl1W_cb |  -106.7927   66.46091    -1.61   0.108    -237.0737    23.48835
+           cashatl1W_cb |  -396.1505   283.1974    -1.40   0.162    -951.2928    158.9917
+              ebitda_cb |   2.27e-07   1.29e-06     0.18   0.860    -2.29e-06    2.75e-06
+           ebitdal1W_cb |    4803.01   4774.132     1.01   0.314    -4555.557    14161.58
+                cfat_cb |  -.0000167   .0000113    -1.48   0.139    -.0000388    5.40e-06
+             cfatl1W_cb |  -11611.42   6256.066    -1.86   0.063    -23874.97    652.1311
+                niat_cb |   .0000146   .0000107     1.36   0.172    -6.38e-06    .0000356
+             niatl1W_cb |  -3017.931   4747.904    -0.64   0.525    -12325.08    6289.223
+               intat_cb |   .0015293   .0025934     0.59   0.555    -.0035544    .0066131
+            intatl1W_cb |  -2.14e+07    8563405    -2.50   0.012    -3.82e+07    -4644248
+     bdatl1W_cfatl1W_cb |   -11759.8   14094.06    -0.83   0.404     -39387.9     15868.3
+   bdatl1W_ebitdal1W_cb |     -22016   23539.27    -0.94   0.350    -68159.23    24127.23
+     bdatl1W_nwatl1W_cb |    1567.12   694.4654     2.26   0.024     205.7838    2928.457
+  ebitdal1W_intatl1W_cb |   6.75e+08   5.46e+08     1.24   0.216    -3.95e+08    1.75e+09
+                        |
+           bdatl1W_tile |
+                     2  |  -19.49856   9.719116    -2.01   0.045    -38.55061   -.4465094
+                     3  |  -24.00358   14.39889    -1.67   0.096    -52.22923    4.222074
+                     4  |  -39.11387    17.7795    -2.20   0.028    -73.96643   -4.261324
+                     5  |  -30.36794   22.37984    -1.36   0.175    -74.23837    13.50249
+                        |
+           nwatl1W_tile |
+                     2  |  -2.348704   9.513838    -0.25   0.805    -20.99835    16.30095
+                     3  |   .3644508   13.96393     0.03   0.979    -27.00857    27.73747
+                     4  |  -3.008646   17.69275    -0.17   0.865    -37.69113    31.67384
+                     5  |   5.042452   19.96966     0.25   0.801    -34.10339    44.18829
+                        |
+         cashatl1W_tile |
+                     2  |  -8.095164   5.578407    -1.45   0.147    -19.03032    2.839995
+                     3  |  -22.83586   8.476622    -2.69   0.007    -39.45229   -6.219432
+                     4  |  -41.61327   14.94837    -2.78   0.005    -70.91605   -12.31048
+                     5  |   -69.6454   18.63663    -3.74   0.000    -106.1782   -33.11265
+                        |
+            ebitda_tile |
+                     2  |  -15.03804   8.825727    -1.70   0.088    -32.33881    2.262729
+                     3  |  -10.06765   10.79812    -0.93   0.351    -31.23484    11.09954
+                     4  |   29.79097    12.0904     2.46   0.014     6.090565    53.49137
+                     5  |   81.37596   14.06152     5.79   0.000     53.81164    108.9403
+                        |
+         ebitdal1W_tile |
+                     2  |   1.482642   10.90602     0.14   0.892    -19.89606    22.86135
+                     3  |  -20.99066   13.40337    -1.57   0.117    -47.26483     5.28351
+                     4  |  -15.70465   15.48464    -1.01   0.311    -46.05865    14.64936
+                     5  |  -9.507857   18.73493    -0.51   0.612     -46.2333    27.21758
+                        |
+              cfat_tile |
+                     2  |   31.00093    11.6873     2.65   0.008     8.090711    53.91115
+                     3  |   39.85389   13.41121     2.97   0.003     13.56434    66.14343
+                     4  |    21.9481   14.71149     1.49   0.136    -6.890321    50.78653
+                     5  |   .5627602   16.30265     0.03   0.972    -31.39477    32.52029
+                        |
+           cfatl1W_tile |
+                     2  |   10.69565   12.76649     0.84   0.402    -14.33006    35.72136
+                     3  |   10.15684   15.15346     0.67   0.503    -19.54797    39.86164
+                     4  |   8.556152   16.93967     0.51   0.614    -24.65011    41.76241
+                     5  |   13.45727   19.82559     0.68   0.497    -25.40616    52.32071
+                        |
+              niat_tile |
+                     2  |  -47.03403   10.96949    -4.29   0.000    -68.53715   -25.53091
+                     3  |  -86.06556   12.59977    -6.83   0.000    -110.7645   -61.36666
+                     4  |  -122.7956   13.71577    -8.95   0.000    -149.6822   -95.90907
+                     5  |  -192.5611   15.23721   -12.64   0.000    -222.4301   -162.6921
+                        |
+           niatl1W_tile |
+                     2  |   8.840717   11.72958     0.75   0.451    -14.15238    31.83381
+                     3  |   19.40205   14.38928     1.35   0.178    -8.804771    47.60887
+                     4  |   57.60131   15.99824     3.60   0.000      26.2405    88.96212
+                     5  |   65.56283   18.61936     3.52   0.000     29.06393    102.0617
+                        |
+             intat_tile |
+                     2  |   153.1009   9.531626    16.06   0.000     134.4164    171.7854
+                     3  |   393.7663   12.59108    31.27   0.000     369.0844    418.4482
+                     4  |   629.0671   14.66381    42.90   0.000     600.3221     657.812
+                     5  |   872.5559   17.32555    50.36   0.000     838.5932    906.5186
+                        |
+          intatl1W_tile |
+                     2  |  -32.26006   9.236027    -3.49   0.000    -50.36513     -14.155
+                     3  |  -93.41944   13.62994    -6.85   0.000    -120.1377   -66.70114
+                     4  |  -180.4891      17.16   -10.52   0.000    -214.1272   -146.8509
+                     5  |  -262.5162   21.41926   -12.26   0.000    -304.5037   -220.5288
+                        |
+   bdatl1W_cfatl1W_tile |
+                     2  |  -3.173882   8.814534    -0.36   0.719    -20.45271    14.10495
+                     3  |  -5.171835   10.24308    -0.50   0.614      -25.251    14.90733
+                     4  |   4.837502    11.5442     0.42   0.675    -17.79221    27.46721
+                     5  |   18.40024   13.78496     1.33   0.182    -8.621948    45.42243
+                        |
+ bdatl1W_ebitdal1W_tile |
+                     2  |   21.23268   13.01951     1.63   0.103    -4.289014    46.75438
+                     3  |   15.81504   14.63874     1.08   0.280    -12.88079    44.51086
+                     4  |   7.194141   16.94089     0.42   0.671     -26.0145    40.40278
+                     5  |  -11.27781   19.40029    -0.58   0.561    -49.30752    26.75191
+                        |
+   bdatl1W_nwatl1W_tile |
+                     2  |   4.101685   7.001045     0.59   0.558    -9.622222    17.82559
+                     3  |  -9.464823   11.54055    -0.82   0.412    -32.08737    13.15772
+                     4  |  -29.43996   14.55294    -2.02   0.043    -57.96759   -.9123218
+                     5  |  -15.10114   18.03129    -0.84   0.402    -50.44727    20.24498
+                        |
+ebitdal1W_intatl1W_tile |
+                     2  |  -23.12468   12.04982    -1.92   0.055    -46.74552    .4961646
+                     3  |  -8.561348   13.81421    -0.62   0.535    -35.64087    18.51817
+                     4  |   4.010911   15.50859     0.26   0.796    -26.39004    34.41186
+                     5  |    10.8008   17.69129     0.61   0.542    -23.87883    45.48042
+                        |
+                  _cons |   160.9818    24.8127     6.49   0.000     112.3423    209.6213
+-----------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+        rank |        39           0          39     |
+        cqtr |        40           1          39     |
+-----------------------------------------------------+
+
+. estadd local Covenant_Control_Variables "Control variables, control variables squared, control variables to the third power, and
+>  quintile indicators for each control"
+
+added macro:
+e(Covenant_Control_Variables) : "Control variables, control variables squared, control variables to the third power, and quintile 
+> indicators for each control"
+
+. eststo
+(est4 stored)
+
+. 
+. esttab using "financial_viol_table3_A.tex", ///
+>         compress replace nonotes keep(viol L.viol) nobaselevels ///
+>         r2 se star(* 0.10 ** 0.05 *** 0.01) nomtitles nogap ///
+>         coeflabels(viol "Covenant violation$_t$" L.viol "Covenant violation$_{t-1}$") ///
+>         stats(Covenant_Control_Variables N r2, labels("Covenant Control Variables" "N" "$ R^2$ ")) ///
+>         prehead("{\begin{tabular}{l*{4}{wc{0.1\textwidth}}}\hline\hline&\multicolumn{4}{c}{Dependent variable: net debt issuance
+> $_t$/assets$_{t-1}$(Basis Points)}\\")
+(output written to financial_viol_table3_A.tex)
+
+. 
+end of do-file
+
+. do "C:\Users\SUQIKE~1\AppData\Local\Temp\STDa184_000000.tmp"
+
+. eststo clear
+
+. reghdfe D.netdebtW viol L.viol, vce(cluster gvkey) absorb(rank cqtr)
+(MWFE estimator converged in 27 iterations)
+
+HDFE Linear regression                            Number of obs   =    120,857
+Absorbing 2 HDFE groups                           F(   2,   7860) =      44.41
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.0041
+                                                  Adj R-squared   =     0.0035
+                                                  Within R-sq.    =     0.0005
+Number of clusters (gvkey)   =      7,861         Root MSE        =   684.6167
+
+                              (Std. err. adjusted for 7,861 clusters in gvkey)
+------------------------------------------------------------------------------
+             |               Robust
+  D.netdebtW | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        viol |
+         --. |   25.88746   10.26193     2.52   0.012     5.771347    46.00357
+         L1. |  -73.28812     10.689    -6.86   0.000    -94.24141   -52.33483
+             |
+       _cons |  -1.492822   .7720387    -1.93   0.053    -3.006223    .0205792
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+        rank |        39           0          39     |
+        cqtr |        40           1          39     |
+-----------------------------------------------------+
+
+. estadd local Covenant_Control_Variables "None"
+
+added macro:
+e(Covenant_Control_Variables) : "None"
+
+. eststo
+(est1 stored)
+
+. 
+. 
+. * Col 2
+. reghdfe D.netdebtW viol L.viol LD.HasRating D.lnatl1W D.tatrl1W D.mbrl1W D2.bdatl1W D2.nwatl1W D.cashatl1W D.ebitda D.ebitdal1W 
+> D.cfat D.cfatl1W D.niat D.niatl1W D.intat D.intatl1W, vce(cluster gvkey) absorb(rank cqtr)
+(dropped 1 singleton observations)
+(MWFE estimator converged in 27 iterations)
+
+HDFE Linear regression                            Number of obs   =    109,417
+Absorbing 2 HDFE groups                           F(  17,   7524) =     206.27
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.1593
+                                                  Adj R-squared   =     0.1586
+                                                  Within R-sq.    =     0.1563
+Number of clusters (gvkey)   =      7,525         Root MSE        =   623.2449
+
+                              (Std. err. adjusted for 7,525 clusters in gvkey)
+------------------------------------------------------------------------------
+             |               Robust
+  D.netdebtW | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        viol |
+         --. |   17.75413   9.343803     1.90   0.057    -.5623369    36.07059
+         L1. |  -97.22999     9.7558    -9.97   0.000    -116.3541   -78.10589
+             |
+   HasRating |
+         LD. |   29.11289   14.19735     2.05   0.040     1.282118    56.94367
+             |
+     lnatl1W |
+         D1. |  -787.6445   21.35511   -36.88   0.000    -829.5064   -745.7825
+             |
+     tatrl1W |
+         D1. |    669.476   81.99991     8.16   0.000     508.7333    830.2188
+             |
+      mbrl1W |
+         D1. |   -.376113   .2586757    -1.45   0.146    -.8831896    .1309636
+             |
+     bdatl1W |
+         D2. |  -1594.157   43.84191   -36.36   0.000      -1680.1   -1508.215
+             |
+     nwatl1W |
+         D2. |   28.25347   27.60164     1.02   0.306    -25.85345     82.3604
+             |
+   cashatl1W |
+         D1. |   23.22362   45.10396     0.51   0.607    -65.19274      111.64
+             |
+      ebitda |
+         D1. |  -.6975096   1.375942    -0.51   0.612    -3.394739     1.99972
+             |
+   ebitdal1W |
+         D1. |  -523.0805   101.1714    -5.17   0.000    -721.4046   -324.7563
+             |
+        cfat |
+         D1. |   .4018759     1.3514     0.30   0.766    -2.247245    3.050997
+             |
+     cfatl1W |
+         D1. |   59.98842   130.1922     0.46   0.645    -195.2247    315.2015
+             |
+        niat |
+         D1. |   .1508676   .2105993     0.72   0.474    -.2619659    .5637011
+             |
+     niatl1W |
+         D1. |   72.02256   114.2506     0.63   0.528    -151.9406    295.9857
+             |
+       intat |
+         D1. |   5.569992   6.014277     0.93   0.354    -6.219671    17.35966
+             |
+    intatl1W |
+         D1. |  -22965.02   1040.977   -22.06   0.000    -25005.63   -20924.42
+             |
+       _cons |   15.52205   .9948363    15.60   0.000      13.5719    17.47221
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+        rank |        38           0          38     |
+        cqtr |        39           1          38     |
+-----------------------------------------------------+
+
+. estadd local Covenant_Control_Variables "Covenant control variables"
+
+added macro:
+e(Covenant_Control_Variables) : "Covenant control variables"
+
+. eststo
+(est2 stored)
+
+. 
+. 
+. * Col 3
+. reghdfe D.netdebtW viol L.viol LD.HasRating D.lnatl1W D.tatrl1W D.mbrl1W D.bdatl1W D.nwatl1W D.cashatl1W D.ebitda D.ebitdal1W D.
+> cfat D.cfatl1W D.niat D.niatl1W D.intat D.intatl1W D2.bdatl1W_cfatl1W D2.bdatl1W_ebitdal1W D2.bdatl1W_nwatl1W D.ebitdal1W_intatl
+> 1W, vce(cluster gvkey) absorb(rank cqtr)
+(dropped 1 singleton observations)
+(MWFE estimator converged in 27 iterations)
+
+HDFE Linear regression                            Number of obs   =    108,734
+Absorbing 2 HDFE groups                           F(  21,   7498) =     284.12
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.2693
+                                                  Adj R-squared   =     0.2687
+                                                  Within R-sq.    =     0.2666
+Number of clusters (gvkey)   =      7,499         Root MSE        =   579.3149
+
+                                    (Std. err. adjusted for 7,499 clusters in gvkey)
+------------------------------------------------------------------------------------
+                   |               Robust
+        D.netdebtW | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------------+----------------------------------------------------------------
+              viol |
+               --. |   30.71312   8.748019     3.51   0.000     13.56455    47.86169
+               L1. |  -79.39265   9.023993    -8.80   0.000     -97.0822   -61.70309
+                   |
+         HasRating |
+               LD. |   26.64536   12.79302     2.08   0.037     1.567459    51.72327
+                   |
+           lnatl1W |
+               D1. |  -763.0469   21.95179   -34.76   0.000    -806.0786   -720.0152
+                   |
+           tatrl1W |
+               D1. |   860.3959   82.63261    10.41   0.000     698.4129    1022.379
+                   |
+            mbrl1W |
+               D1. |   -1.00587   .2394412    -4.20   0.000    -1.475242   -.5364984
+                   |
+           bdatl1W |
+               D1. |   -3789.27   64.84046   -58.44   0.000    -3916.376   -3662.165
+                   |
+           nwatl1W |
+               D1. |    219.414   39.98211     5.49   0.000     141.0378    297.7901
+                   |
+         cashatl1W |
+               D1. |  -128.8858   42.15652    -3.06   0.002    -211.5244   -46.24718
+                   |
+            ebitda |
+               D1. |  -.8167151   1.240758    -0.66   0.510    -3.248948    1.615518
+                   |
+         ebitdal1W |
+               D1. |   -206.754   101.4076    -2.04   0.042    -405.5413     -7.9667
+                   |
+              cfat |
+               D1. |   .7420504   1.203951     0.62   0.538    -1.618032    3.102133
+                   |
+           cfatl1W |
+               D1. |   109.3919   118.9757     0.92   0.358    -123.8338    342.6176
+                   |
+              niat |
+               D1. |  -.1617641   .2106451    -0.77   0.443    -.5746876    .2511595
+                   |
+           niatl1W |
+               D1. |   108.2629   100.2081     1.08   0.280    -88.17308    304.6988
+                   |
+             intat |
+               D1. |   5.057472   6.093392     0.83   0.407    -6.887284    17.00223
+                   |
+          intatl1W |
+               D1. |  -3541.135   1050.383    -3.37   0.001    -5600.181   -1482.089
+                   |
+   bdatl1W_cfatl1W |
+               D2. |   11.32428   110.6485     0.10   0.918    -205.5778    228.2264
+                   |
+ bdatl1W_ebitdal1W |
+               D2. |  -435.8548   156.9257    -2.78   0.005    -743.4731   -128.2364
+                   |
+   bdatl1W_nwatl1W |
+               D2. |  -1309.827   52.98776   -24.72   0.000    -1413.698   -1205.956
+                   |
+ebitdal1W_intatl1W |
+               D1. |  -27399.83   5954.778    -4.60   0.000    -39072.87    -15726.8
+                   |
+             _cons |   19.09911   1.137378    16.79   0.000     16.86953    21.32869
+------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+        rank |        38           0          38     |
+        cqtr |        39           1          38     |
+-----------------------------------------------------+
+
+. estadd local Covenant_Control_Variables "Covenant control variables, Covenant interaction control variables"
+
+added macro:
+e(Covenant_Control_Variables) : "Covenant control variables, Covenant interaction control variables"
+
+. eststo
+(est3 stored)
+
+. 
+. 
+. * Col 4
+. reghdfe D.netdebtW viol L.viol LD.HasRating D.lnatl1W D.tatrl1W D.mbrl1W D.bdatl1W D.nwatl1W D.cashatl1W D.ebitda D.ebitdal1W D.
+> cfat D.cfatl1W D.niat D.niatl1W D.intat D.intatl1W D2.bdatl1W_cfatl1W D2.bdatl1W_ebitdal1W D2.bdatl1W_nwatl1W D.ebitdal1W_intatl
+> 1W D.*_sq D.*_cb i.*_tile, vce(cluster gvkey) absorb(rank cqtr)
+(dropped 1 singleton observations)
+(MWFE estimator converged in 27 iterations)
+
+HDFE Linear regression                            Number of obs   =    108,734
+Absorbing 2 HDFE groups                           F( 111,   7498) =     118.33
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.3310
+                                                  Adj R-squared   =     0.3299
+                                                  Within R-sq.    =     0.3286
+Number of clusters (gvkey)   =      7,499         Root MSE        =   554.5469
+
+                                         (Std. err. adjusted for 7,499 clusters in gvkey)
+-----------------------------------------------------------------------------------------
+                        |               Robust
+             D.netdebtW | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+------------------------+----------------------------------------------------------------
+                   viol |
+                    --. |   18.05459    8.69112     2.08   0.038     1.017557    35.09162
+                    L1. |  -68.08059   8.978789    -7.58   0.000    -85.68154   -50.47965
+                        |
+              HasRating |
+                    LD. |   36.59258   11.88607     3.08   0.002     13.29254    59.89261
+                        |
+                lnatl1W |
+                    D1. |  -668.5602   21.59121   -30.96   0.000    -710.8851   -626.2354
+                        |
+                tatrl1W |
+                    D1. |   756.0339   82.79913     9.13   0.000     593.7244    918.3435
+                        |
+                 mbrl1W |
+                    D1. |  -.6995936   .2308662    -3.03   0.002    -1.152156   -.2470311
+                        |
+                bdatl1W |
+                    D1. |   -5783.97   236.6411   -24.44   0.000    -6247.853   -5320.087
+                        |
+                nwatl1W |
+                    D1. |   198.8496   56.59112     3.51   0.000     87.91515    309.7841
+                        |
+              cashatl1W |
+                    D1. |  -1104.888   145.8132    -7.58   0.000    -1390.723   -819.0536
+                        |
+                 ebitda |
+                    D1. |  -4.058186   1.868624    -2.17   0.030    -7.721213   -.3951588
+                        |
+              ebitdal1W |
+                    D1. |  -260.5433   140.3865    -1.86   0.064    -535.7401    14.65357
+                        |
+                   cfat |
+                    D1. |   7.142233   3.679691     1.94   0.052    -.0709924    14.35546
+                        |
+                cfatl1W |
+                    D1. |  -168.0699   202.1295    -0.83   0.406    -564.3004    228.1607
+                        |
+                   niat |
+                    D1. |  -5.617313   3.254625    -1.73   0.084    -11.99729    .7626654
+                        |
+                niatl1W |
+                    D1. |  -82.40715   212.7745    -0.39   0.699    -499.5048    334.6905
+                        |
+                  intat |
+                    D1. |  -13.31787    24.4102    -0.55   0.585    -61.16871    34.53297
+                        |
+               intatl1W |
+                    D1. |   3890.538   4933.238     0.79   0.430    -5779.993    13561.07
+                        |
+        bdatl1W_cfatl1W |
+                    D2. |   213.6993   146.0333     1.46   0.143    -72.56682    499.9654
+                        |
+      bdatl1W_ebitdal1W |
+                    D2. |   56.41457   192.4801     0.29   0.769    -320.9004    433.7295
+                        |
+        bdatl1W_nwatl1W |
+                    D2. |  -676.2403   60.23405   -11.23   0.000    -794.3159   -558.1646
+                        |
+     ebitdal1W_intatl1W |
+                    D1. |  -45444.24   10850.96    -4.19   0.000    -66715.17   -24173.31
+                        |
+             bdatl1W_sq |
+                    D1. |    612.807    645.846     0.95   0.343    -653.2323    1878.846
+                        |
+             nwatl1W_sq |
+                    D1. |   69.59572   104.2909     0.67   0.505    -134.8436    274.0351
+                        |
+           cashatl1W_sq |
+                    D1. |   2110.316   480.0434     4.40   0.000     1169.296    3051.336
+                        |
+              ebitda_sq |
+                    D1. |  -.0057464   .0031768    -1.81   0.071    -.0119739     .000481
+                        |
+           ebitdal1W_sq |
+                    D1. |  -6527.423   1404.713    -4.65   0.000    -9281.054   -3773.792
+                        |
+                cfat_sq |
+                    D1. |  -.0174889   .0085304    -2.05   0.040    -.0342108   -.0007669
+                        |
+             cfatl1W_sq |
+                    D1. |  -4542.315   2203.908    -2.06   0.039    -8862.591   -222.0378
+                        |
+                niat_sq |
+                    D1. |   .0185136   .0079763     2.32   0.020     .0028778    .0341494
+                        |
+             niatl1W_sq |
+                    D1. |  -301.8728   2057.318    -0.15   0.883    -4334.794    3731.048
+                        |
+               intat_sq |
+                    D1. |   .6140591   .6120223     1.00   0.316    -.5856763    1.813794
+                        |
+            intatl1W_sq |
+                    D1. |  -117871.2   436012.7    -0.27   0.787    -972578.3    736835.9
+                        |
+     bdatl1W_cfatl1W_sq |
+                    D1. |   25158.53   4109.259     6.12   0.000     17103.23    33213.83
+                        |
+   bdatl1W_ebitdal1W_sq |
+                    D1. |   29452.59   6936.256     4.25   0.000     15855.58    43049.59
+                        |
+     bdatl1W_nwatl1W_sq |
+                    D1. |   -567.604   649.3105    -0.87   0.382    -1840.435    705.2266
+                        |
+  ebitdal1W_intatl1W_sq |
+                    D1. |  -1.92e+07    5417632    -3.54   0.000    -2.98e+07    -8552080
+                        |
+             bdatl1W_cb |
+                    D1. |   1733.752   523.5125     3.31   0.001     707.5208    2759.983
+                        |
+             nwatl1W_cb |
+                    D1. |  -148.7719    120.187    -1.24   0.216    -384.3722     86.8283
+                        |
+           cashatl1W_cb |
+                    D1. |  -932.7622   427.3905    -2.18   0.029    -1770.567   -94.95705
+                        |
+              ebitda_cb |
+                    D1. |  -8.87e-07   1.86e-06    -0.48   0.633    -4.52e-06    2.75e-06
+                        |
+           ebitdal1W_cb |
+                    D1. |   -17970.8    4873.36    -3.69   0.000    -27523.95   -8417.649
+                        |
+                cfat_cb |
+                    D1. |  -.0000207   .0000101    -2.05   0.041    -.0000405   -8.80e-07
+                        |
+             cfatl1W_cb |
+                    D1. |  -9574.666   6339.874    -1.51   0.131     -22002.6    2853.265
+                        |
+                niat_cb |
+                    D1. |   .0000201   9.27e-06     2.17   0.030     1.91e-06    .0000382
+                        |
+             niatl1W_cb |
+                    D1. |  -275.0159    4960.31    -0.06   0.956    -9998.615    9448.583
+                        |
+               intat_cb |
+                    D1. |  -.0045056   .0030491    -1.48   0.140    -.0104827    .0014714
+                        |
+            intatl1W_cb |
+                    D1. |    5000880   1.05e+07     0.48   0.635    -1.56e+07    2.56e+07
+                        |
+     bdatl1W_cfatl1W_cb |
+                    D1. |   83972.99   13918.54     6.03   0.000     56688.75    111257.2
+                        |
+   bdatl1W_ebitdal1W_cb |
+                    D1. |   80129.71   27680.23     2.89   0.004      25868.7    134390.7
+                        |
+     bdatl1W_nwatl1W_cb |
+                    D1. |  -2076.165   1199.584    -1.73   0.084    -4427.685    275.3552
+                        |
+  ebitdal1W_intatl1W_cb |
+                    D1. |  -1.46e+09   6.17e+08    -2.37   0.018    -2.67e+09   -2.54e+08
+                        |
+           bdatl1W_tile |
+                     2  |    -76.693   9.900256    -7.75   0.000    -96.10028   -57.28572
+                     3  |  -142.7536   12.41711   -11.50   0.000    -167.0946   -118.4126
+                     4  |  -202.7227   14.16621   -14.31   0.000    -230.4924    -174.953
+                     5  |  -249.3803    15.6939   -15.89   0.000    -280.1448   -218.6159
+                        |
+           nwatl1W_tile |
+                     2  |   38.76441    7.29013     5.32   0.000     24.47371    53.05511
+                     3  |   61.27305   8.408316     7.29   0.000      44.7904    77.75571
+                     4  |   63.29073   9.003627     7.03   0.000     45.64109    80.94036
+                     5  |   65.26251   9.159355     7.13   0.000      47.3076    83.21741
+                        |
+         cashatl1W_tile |
+                     2  |  -12.99844   5.239812    -2.48   0.013    -23.26994   -2.726943
+                     3  |  -12.93784   5.048301    -2.56   0.010    -22.83392   -3.041754
+                     4  |  -29.71574   5.106554    -5.82   0.000    -39.72601   -19.70546
+                     5  |  -37.58332   6.017256    -6.25   0.000    -49.37883   -25.78781
+                        |
+            ebitda_tile |
+                     2  |  -13.52997   10.97282    -1.23   0.218    -35.03977    7.979822
+                     3  |  -18.37998   13.36878    -1.37   0.169    -44.58654    7.826592
+                     4  |   11.04397   14.89594     0.74   0.458    -18.15625    40.24419
+                     5  |   50.33956   17.12558     2.94   0.003     16.76863    83.91049
+                        |
+         ebitdal1W_tile |
+                     2  |  -20.95142   11.36455    -1.84   0.065    -43.22913    1.326293
+                     3  |  -7.192987   13.38384    -0.54   0.591    -33.42907     19.0431
+                     4  |    10.4268   14.86254     0.70   0.483    -18.70796    39.56155
+                     5  |   14.93409   16.79435     0.89   0.374    -17.98754    47.85572
+                        |
+              cfat_tile |
+                     2  |   35.91967   14.76276     2.43   0.015     6.980517    64.85882
+                     3  |    53.8315   16.71156     3.22   0.001     21.07216    86.59085
+                     4  |   52.38018   18.04165     2.90   0.004     17.01349    87.74687
+                     5  |   47.07301   19.63546     2.40   0.017     8.581997    85.56403
+                        |
+           cfatl1W_tile |
+                     2  |   10.57404   14.27252     0.74   0.459    -17.40411    38.55218
+                     3  |   16.19679   16.34627     0.99   0.322    -15.84648    48.24006
+                     4  |    22.2941   17.71597     1.26   0.208    -12.43416    57.02237
+                     5  |   36.49037   19.52924     1.87   0.062    -1.792414    74.77316
+                        |
+              niat_tile |
+                     2  |  -35.94386   13.71086    -2.62   0.009    -62.82099   -9.066732
+                     3  |  -80.64691   15.43057    -5.23   0.000    -110.8952   -50.39866
+                     4  |  -144.2679   16.47752    -8.76   0.000    -176.5685   -111.9673
+                     5  |  -226.0559   18.08122   -12.50   0.000    -261.5002   -190.6116
+                        |
+           niatl1W_tile |
+                     2  |   13.11164   13.38058     0.98   0.327    -13.11804    39.34132
+                     3  |    43.2271   15.17336     2.85   0.004     13.48305    72.97114
+                     4  |   87.19788   16.12378     5.41   0.000     55.59075     118.805
+                     5  |   121.0811   17.76852     6.81   0.000     86.24985    155.9124
+                        |
+             intat_tile |
+                     2  |   134.3567   11.51217    11.67   0.000     111.7896    156.9238
+                     3  |   361.8842   15.55169    23.27   0.000     331.3986    392.3699
+                     4  |   602.9538   18.12005    33.28   0.000     567.4334    638.4741
+                     5  |   859.1896   21.68789    39.62   0.000     816.6753     901.704
+                        |
+          intatl1W_tile |
+                     2  |  -43.95963   11.07425    -3.97   0.000    -65.66826   -22.25101
+                     3  |  -173.3524   14.95346   -11.59   0.000    -202.6653   -144.0394
+                     4  |    -345.62   17.56503   -19.68   0.000    -380.0524   -311.1876
+                     5  |   -550.476   20.99405   -26.22   0.000    -591.6302   -509.3217
+                        |
+   bdatl1W_cfatl1W_tile |
+                     2  |   13.05759   9.504578     1.37   0.170    -5.574054    31.68922
+                     3  |   6.121677   10.47194     0.58   0.559    -14.40626    26.64962
+                     4  |  -5.572115   11.78836    -0.47   0.636    -28.68061    17.53638
+                     5  |  -22.24761   13.38548    -1.66   0.097    -48.48691    3.991677
+                        |
+ bdatl1W_ebitdal1W_tile |
+                     2  |   14.03862    14.6034     0.96   0.336    -14.58814    42.66538
+                     3  |  -5.081532   16.46407    -0.31   0.758    -37.35573    27.19267
+                     4  |  -31.96789   18.58608    -1.72   0.085    -68.40182    4.466041
+                     5  |  -94.14105   20.61514    -4.57   0.000    -134.5525   -53.72959
+                        |
+   bdatl1W_nwatl1W_tile |
+                     2  |   28.87632   6.426617     4.49   0.000     16.27835    41.47429
+                     3  |  -37.06899   7.249074    -5.11   0.000     -51.2792   -22.85877
+                     4  |  -64.57046   8.319563    -7.76   0.000    -80.87914   -48.26179
+                     5  |  -62.80907   9.053662    -6.94   0.000    -80.55679   -45.06136
+                        |
+ebitdal1W_intatl1W_tile |
+                     2  |  -2.371195   13.64502    -0.17   0.862    -29.11926    24.37687
+                     3  |   21.18314   15.99617     1.32   0.185    -10.17384    52.54012
+                     4  |   37.74182   17.57364     2.15   0.032     3.292564    72.19108
+                     5  |   39.31036     19.241     2.04   0.041     1.592596    77.02812
+                        |
+                  _cons |  -26.52177   14.66862    -1.81   0.071    -55.27637    2.232835
+-----------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-----------------------------------------------------+
+ Absorbed FE | Categories  - Redundant  = Num. Coefs |
+-------------+---------------------------------------|
+        rank |        38           0          38     |
+        cqtr |        39           1          38     |
+-----------------------------------------------------+
+
+. estadd local Covenant_Control_Variables "Control variables, control variables squared, control variables to the third power, and
+>  quintile indicators for each control"
+
+added macro:
+e(Covenant_Control_Variables) : "Control variables, control variables squared, control variables to the third power, and quintile 
+> indicators for each control"
+
+. eststo
+(est4 stored)
+
+. 
+. esttab using "financial_viol_table3_B.tex", ///
+>         compress replace nonotes keep(viol L.viol) nobaselevels ///
+>         r2 se star(* 0.10 ** 0.05 *** 0.01) nomtitles nogap ///
+>         coeflabels(viol "Covenant violation$_t$" L.viol "Covenant violation$_{t-1}$") ///
+>         stats(Covenant_Control_Variables N r2, labels("Covenant Control Variables" "N" "$ R^2$ ")) ///
+>         prehead("{\begin{tabular}{l*{4}{wc{0.1\textwidth}}}\hline\hline&\multicolumn{4}{c}{Dependent variable: Change in net deb
+> t issuance$_t$/assets$_{t-1}$(Basis Points)}\\")
+(output written to financial_viol_table3_B.tex)
+
+. 
+. 
+. 
+. log close
+      name:  <unnamed>
+       log:  D:\Documents\study\MSyear1\Empirical Corp Fin\Assignment 1\finviol.log
+  log type:  text
+ closed on:   6 Feb 2024, 05:07:45
+----------------------------------------------------------------------------------------------------------------------------------

@@ -1,0 +1,1115 @@
+----------------------------------------------------------------------------------------------------------------------------------
+      name:  <unnamed>
+       log:  D:\Documents\study\MSyear1\Empirical Corp Fin\Assignment 1\bankline.log
+  log type:  text
+ opened on:   6 Feb 2024, 06:11:37
+
+. 
+. use "Compustat_93-05.dta", replace
+
+. 
+. *** Solve the duplication problem
+. duplicates report gvkey fyear
+
+Duplicates in terms of gvkey fyear
+
+--------------------------------------
+   Copies | Observations       Surplus
+----------+---------------------------
+        1 |       138909             0
+        2 |        30656         15328
+        4 |            4             3
+--------------------------------------
+
+. duplicates tag gvkey fyear, gen(tag)
+
+Duplicates in terms of gvkey fyear
+
+. * the duplicates are because the rows with indfmt=="FS" has missing variables but indfmt==="INDL" don't.
+. drop if indfmt=="FS"
+(15,363 observations deleted)
+
+. duplicates report gvkey fyear
+
+Duplicates in terms of gvkey fyear
+
+--------------------------------------
+   Copies | Observations       Surplus
+----------+---------------------------
+        1 |       154206             0
+--------------------------------------
+
+. save "Compustat_93-05_nodup.dta", replace
+file Compustat_93-05_nodup.dta saved
+
+. 
+. use "Compustat_93-05_nodup.dta", replace
+
+. 
+. *** Adding the approximate ipo date
+. preserve
+
+. use "Compustat_ipo.dta", clear
+
+. sort gvkey fyear
+
+. drop if mi(prcc_f)
+(101,117 observations deleted)
+
+. * define the IPO year as the first year that a firm has record of closing price in Compustat 
+. bysort gvkey: egen ipo_yr = min(fyear)
+
+. keep gvkey ipo
+
+. duplicates drop
+
+Duplicates in terms of all variables
+
+(253,161 observations deleted)
+
+. tempfile ipo
+
+. save "`ipo'"
+file C:\Users\SUQIKE~1\AppData\Local\Temp\ST_64b0_00000b.tmp saved as .dta format
+
+. restore
+
+. 
+. merge m:1 gvkey using "`ipo'", keep(1 3)
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                         9,287
+        from master                     9,287  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                           144,919  (_merge==3)
+    -----------------------------------------
+
+. drop _m
+
+. 
+. * Adding the S&P indicator: how does he define this indicator? (firm, or firm-year) Here I just follow this: if a firm has been 
+> a S&P member, then it has sp==1.
+. preserve
+
+. use "SPMIM_data", replace
+
+. tostring gvkey, replace format(%06.0f)
+gvkey was long now str6
+
+. gen sp = (!mi(spmim))
+
+. bys gvkey: egen max_sp = max(sp)
+
+. keep if max_sp == 1
+(1,415,975 observations deleted)
+
+. keep gvkey max_sp
+
+. duplicates drop
+
+Duplicates in terms of all variables
+
+(334,222 observations deleted)
+
+. tempfile spmim
+
+. save "`spmim'"
+file C:\Users\SUQIKE~1\AppData\Local\Temp\ST_64b0_00000d.tmp saved as .dta format
+
+. restore
+
+. 
+. merge m:1 gvkey using "`spmim'"
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       122,128
+        from master                   122,128  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                            32,078  (_merge==3)
+    -----------------------------------------
+
+. drop if _m==2
+(0 observations deleted)
+
+. replace max_sp = 0 if max_sp == 1
+(32,078 real changes made)
+
+. replace max_sp = 1 if mi(max_sp)
+(122,128 real changes made)
+
+. ren max_sp sp
+
+. drop _m
+
+. 
+. /*
+> * Adding the tangible asset data
+> preserve
+> use "Compustat_ppe.dta", clear
+> drop if indfmt=="FS"
+> tempfile ppe
+> save "`ppe'"
+> restore
+> merge 1:1 gvkey fyear using "`ppe'", keepusing(ppent) nogen keep(3)
+> 
+> 
+> 
+> * Adding the stock exchange information
+> preserve
+> use "exchg.dta", clear
+> duplicates drop exchg gvkey fyear, force
+> gen otc = (exchg==19)
+> keep gvkey fyear otc
+> tempfile otc
+> save "`otc'"
+> restore
+> 
+> merge 1:1 gvkey fyear using "`otc'", keep(3) nogen
+> */
+. 
+. 
+. /*
+> * Adding SIC information
+> preserve
+> use "SIC", replace
+> keep gvkey fyear sic
+> duplicates drop
+> tempfile sic
+> save "`sic'"
+> restore
+> 
+> merge 1:1 gvkey fyear using "`sic'", keep(3) nogen
+> */
+. 
+. ********************** fill in missing values to avoid missing mblc ***********
+. replace txditc=0 if mi(txditc)
+(30,132 real changes made)
+
+. replace pstkl=0 if mi(pstkl)
+(16,895 real changes made)
+
+. 
+. ****************************** Generating variables **************************
+. destring gvkey, replace
+gvkey: all characters numeric; replaced as long
+
+. xtset gvkey fyear
+
+Panel variable: gvkey (unbalanced)
+ Time variable: fyear, 1992 to 2005, but with gaps
+         Delta: 1 unit
+
+. gen age = fyear-ipo_yr
+(9,287 missing values generated)
+
+. gen asslc = at - che
+(15,801 missing values generated)
+
+. gen cflc = oibdp/asslc
+(20,789 missing values generated)
+
+. gen bd = (dlc+dltt)/at
+(16,771 missing values generated)
+
+. gen tanglc = ppent/asslc
+(19,884 missing values generated)
+
+. gen nwlc = (asslc-lt)/asslc
+(16,927 missing values generated)
+
+. gen bveq = at - lt - pstkl + txditc
+(15,952 missing values generated)
+
+. gen mkeq = csho * prcc_f
+(27,462 missing values generated)
+
+. gen mblc = (at - bveq + mkeq - che)/asslc
+(36,285 missing values generated)
+
+. gen otc = (exchg==19)
+
+. 
+. 
+. foreach v in asslc cflc bd tanglc nwlc mblc{
+  2.         gen `v'l1 = L.`v'
+  3. }
+(35,220 missing values generated)
+(39,403 missing values generated)
+(36,039 missing values generated)
+(38,732 missing values generated)
+(36,139 missing values generated)
+(53,047 missing values generated)
+
+. 
+. 
+. ******************** Merge sufi_data with Compustat **************************
+. /*
+> preserve
+> use "sufi_rfs_linesofcredit20070221data", replace
+> ren yeara fyear
+> tostring gvkey, replace format(%06.0f)
+> save "sufi_rfs_linesofcredit20070221data", replace
+> restore
+> */
+. 
+. tostring gvkey, replace format(%06.0f)
+gvkey was long now str6
+
+. merge 1:1 gvkey fyear using "sufi_rfs_linesofcredit20070221data"
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                       125,759
+        from master                   125,759  (_merge==1)
+        from using                          0  (_merge==2)
+
+    Matched                            28,447  (_merge==3)
+    -----------------------------------------
+
+. keep if _m==3
+(125,759 observations deleted)
+
+. drop _m
+
+. 
+. *** Construct industry sales 
+. gen sic3 = substr(sic,1,3)
+
+. 
+. preserve
+
+. use "Compustat_quarter_sales", replace
+
+. destring gvkey, replace
+gvkey: all characters numeric; replaced as long
+
+. gen fyq = 100*fyearq+fqtr
+
+. drop if mi(datafqtr)
+(442 observations deleted)
+
+. keep fyq
+
+. duplicates drop
+
+Duplicates in terms of all variables
+
+(610,643 observations deleted)
+
+. egen q_num = rank(fyq), track
+
+. tempfile rank
+
+. save "`rank'"
+file C:\Users\SUQIKE~1\AppData\Local\Temp\ST_64b0_00000f.tmp saved as .dta format
+
+. restore
+
+. 
+. preserve
+
+. use "Compustat_quarter_sales", replace
+
+. destring gvkey, replace
+gvkey: all characters numeric; replaced as long
+
+. gen fyq = 100*fyearq+fqtr
+
+. drop if mi(datafqtr)
+(442 observations deleted)
+
+. merge m:1 fyq using "`rank'", keep(3) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                           610,699  
+    -----------------------------------------
+
+. xtset gvkey q_num
+
+Panel variable: gvkey (unbalanced)
+ Time variable: q_num, 1 to 56, but with gaps
+         Delta: 1 unit
+
+. * changes of sales
+. gen chg_sales = saleq - L.saleq
+(94,323 missing values generated)
+
+. * calculate the standard deviation of the changes in sales within each SIC 3-digit industry
+. bys gvkey fyear: egen avg_asset = mean(at)
+(37,928 missing values generated)
+
+. bys gvkey fyear: egen sd_csales = sd(chg_sales)
+(79,865 missing values generated)
+
+. gen sd_csales_at = sd_csales/avg_asset
+(81,302 missing values generated)
+
+. gen sic3 = substr(sic,1,3)
+
+. bys sic3 fyear: egen sd_csales_med = median(sd_csales_at)
+(2,397 missing values generated)
+
+. ren fyearq fyear
+
+. keep sic3 fyear sd_csales_med
+
+. duplicates drop
+
+Duplicates in terms of all variables
+
+(606,727 observations deleted)
+
+. tempfile ind_var
+
+. save "`ind_var'"
+file C:\Users\SUQIKE~1\AppData\Local\Temp\ST_64b0_00000h.tmp saved as .dta format
+
+. restore
+
+. 
+. merge m:1 sic3 fyear using "`ind_var'", keep(1 3) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                            28,447  
+    -----------------------------------------
+
+. ren sd_csales_med q_salesvar
+
+. 
+. *** Construct cash-flow volatility
+. preserve
+
+. use "Compustat_lag", replace
+
+. keep gvkey fyear oibdp at che
+
+. foreach v in oibdp at che{
+  2.         replace `v' = 0 if mi(`v') 
+  3. }
+(44,078 real changes made)
+(23,671 real changes made)
+(39,695 real changes made)
+
+. duplicates drop gvkey fyear, force
+
+Duplicates in terms of gvkey fyear
+
+(17,392 observations deleted)
+
+. * generate noncash asset
+. gen noncash_at = at-che
+
+. 
+. destring gvkey, replace
+gvkey: all characters numeric; replaced as long
+
+. xtset gvkey fyear
+
+Panel variable: gvkey (unbalanced)
+ Time variable: fyear, 1988 to 2004, but with gaps
+         Delta: 1 unit
+
+. * change of ebitda
+. gen chg_ebitda = oibdp - L.oibdp
+(22,182 missing values generated)
+
+. * fill the empty values
+. replace chg_ebitda = 0 if mi(chg_ebitda)
+(22,182 real changes made)
+
+. 
+. *** calculate the mean of changes in ebitda
+. gen mean_4yr = (L.chg_ebitda + L2.chg_ebitda + L3.chg_ebitda + L4.chg_ebitda)/4
+(80,832 missing values generated)
+
+. * standard deviation of changes in ebitda
+. gen var_4yr = ((L.chg_ebitda - mean_4yr)^2 + (L2.chg_ebitda - mean_4yr)^2 + (L3.chg_ebitda - mean_4yr)^2 + (L4.chg_ebitda - mean
+> _4yr)^2)/4
+(80,832 missing values generated)
+
+. gen sd_4yr = sqrt(var_4yr)
+(80,832 missing values generated)
+
+. gen avg_noncash = (L.noncash_at + L2.noncash_at + L3.noncash_at + L4.noncash_at)/4
+(80,832 missing values generated)
+
+. gen sd_4yr_at = sd_4yr/avg_noncash
+(87,596 missing values generated)
+
+. tostring gvkey, replace format(%06.0f)
+gvkey was long now str6
+
+. ren sd_4yr_at cfvar
+
+. tempfile cfv
+
+. save "`cfv'"
+file C:\Users\SUQIKE~1\AppData\Local\Temp\ST_64b0_00000j.tmp saved as .dta format
+
+. restore
+
+. 
+. merge 1:1 gvkey fyear using "`cfv'", keep(3) nogen
+
+    Result                      Number of obs
+    -----------------------------------------
+    Not matched                             0
+    Matched                            28,447  
+    -----------------------------------------
+
+. replace cfvar=0 if mi(cfvar) // fill the missing values
+(2,133 real changes made)
+
+. 
+. * winsorize the variables
+. foreach v in cflcl1 tanglcl1 nwlcl1 asslcl1 mblcl1 cfvar q_salesvar{
+  2.         winsor `v', generate(`v'W) p(0.05)
+  3.         sum `v'W, d
+  4. }
+
+               cflcl1, Winsorized fraction .05
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -1.163636      -1.163636
+ 5%    -1.163636      -1.163636
+10%    -.4027828      -1.163636       Obs              28,447
+25%     .0315205      -1.163636       Sum of wgt.      28,447
+
+50%     .1246763                      Mean           .0260778
+                        Largest       Std. dev.      .3579037
+75%     .1992902       .3960514
+90%     .3017354       .3960514       Variance        .128095
+95%     .3960514       .3960514       Skewness      -2.242478
+99%     .3960514       .3960514       Kurtosis       7.539641
+
+              tanglcl1, Winsorized fraction .05
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%     .0421256       .0421256
+ 5%     .0421256       .0421256
+10%     .0698456       .0421256       Obs              28,447
+25%     .1440546       .0421256       Sum of wgt.      28,447
+
+50%     .2771763                      Mean           .3395396
+                        Largest       Std. dev.      .2394693
+75%     .4965568       .8447773
+90%     .7390909       .8447773       Variance       .0573455
+95%     .8447773       .8447773       Skewness       .7089818
+99%     .8447773       .8447773       Kurtosis       2.386338
+
+               nwlcl1, Winsorized fraction .05
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%    -.0567124      -.0567124
+ 5%    -.0567124      -.0567124
+10%     .1171495      -.0567124       Obs              28,447
+25%     .2908067      -.0567124       Sum of wgt.      28,447
+
+50%     .4519239                      Mean           .4429834
+                        Largest       Std. dev.      .2347567
+75%     .6239845       .8216346
+90%     .7577031       .8216346       Variance       .0551107
+95%     .8216346       .8216346       Skewness      -.3163393
+99%     .8216346       .8216346       Kurtosis       2.429719
+
+              asslcl1, Winsorized fraction .05
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%        2.949          2.949
+ 5%        2.949          2.949
+10%        6.303          2.949       Obs              28,447
+25%       22.206          2.949       Sum of wgt.      28,447
+
+50%      102.461                      Mean           730.8879
+                        Largest       Std. dev.      1476.471
+75%      555.244       5916.369
+90%       2319.6       5916.369       Variance        2179968
+95%     5916.369       5916.369       Skewness       2.646505
+99%     5916.369       5916.369       Kurtosis       9.020714
+
+               mblcl1, Winsorized fraction .05
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%     .6657911       .6657911
+ 5%     .6657911       .6657911
+10%     .8154576       .6657911       Obs              28,445
+25%     1.051237       .6657911       Sum of wgt.      28,445
+
+50%     1.538744                      Mean           2.979183
+                        Largest       Std. dev.      3.542502
+75%     2.914916       14.77255
+90%     7.520574       14.77255       Variance       12.54932
+95%     14.77255       14.77255       Skewness       2.341706
+99%     14.77255       14.77255       Kurtosis       7.602291
+
+               cfvar, Winsorized fraction .05
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%            0              0
+ 5%            0              0
+10%     .0059022              0       Obs              28,447
+25%     .0193238              0       Sum of wgt.      28,447
+
+50%      .048261                      Mean           .1024284
+                        Largest       Std. dev.       .131994
+75%     .1248252       .5063019
+90%     .2943947       .5063019       Variance       .0174224
+95%     .5063019       .5063019       Skewness        1.92027
+99%     .5063019       .5063019       Kurtosis       5.863299
+
+             q_salesvar, Winsorized fraction .05
+-------------------------------------------------------------
+      Percentiles      Smallest
+ 1%     .0128551       .0128551
+ 5%     .0128551       .0128551
+10%     .0160298       .0128551       Obs              28,447
+25%     .0242782       .0128551       Sum of wgt.      28,447
+
+50%     .0327869                      Mean           .0406116
+                        Largest       Std. dev.      .0251433
+75%     .0467815       .1081078
+90%     .0838582       .1081078       Variance       .0006322
+95%     .1081078       .1081078       Skewness        1.42321
+99%     .1081078       .1081078       Kurtosis       4.272299
+
+. 
+. ************************* Summary Statistics (Table 1) **********************
+. *** full sample, using winsorized variables
+. eststo clear
+
+. estpost sum lineofcredit bd cflcl1W tanglcl1W nwlcl1W asslcl1 mblcl1W q_salesvarW cfvarW sp otc age, d
+
+             |  e(count)   e(sum_w)    e(mean)     e(Var)      e(sd)  e(skewn~)  e(kurto~)     e(sum)     e(min)     e(max) 
+-------------+--------------------------------------------------------------------------------------------------------------
+lineofcredit |     28447      28447   .8169227   .1495653   .3867367  -1.638987    3.68628      23239          0          1 
+          bd |     28413      28413   .2036465    .036263   .1904284   .7387143   2.784757   5786.209          0     .96456 
+     cflcl1W |     28447      28447   .0260778    .128095   .3579037  -2.242478   7.539641   741.8349  -1.163636   .3960514 
+   tanglcl1W |     28447      28447   .3395396   .0573455   .2394693   .7089818   2.386338   9658.884   .0421256   .8447773 
+     nwlcl1W |     28447      28447   .4429834   .0551107   .2347567  -.3163393   2.429719   12601.55  -.0567124   .8216346 
+     asslcl1 |     28447      28447   1608.557   1.14e+08   10672.17   25.24749   867.4796   4.58e+07       .001     558501 
+     mblcl1W |     28445      28445   2.979183   12.54932   3.542502   2.341706   7.602291   84742.86   .6657911   14.77255 
+ q_salesvarW |     28447      28447   .0406116   .0006322   .0251433    1.42321   4.272299   1155.279   .0128551   .1081078 
+      cfvarW |     28447      28447   .1024284   .0174224    .131994    1.92027   5.863299    2913.78          0   .5063019 
+          sp |     28447      28447   .6203466    .235525   .4853092  -.4959673   1.245984      17647          0          1 
+         otc |     28447      28447   .1850459   .1508092   .3883416   1.622075   3.631128       5264          0          1 
+         age |     28447      28447   13.99121   130.8412   11.43859   .8340263   2.454883     398008         -1         45 
+
+             |     e(p1)      e(p5)     e(p10)     e(p25)     e(p50)     e(p75)     e(p90)     e(p95)     e(p99) 
+-------------+---------------------------------------------------------------------------------------------------
+lineofcredit |         0          0          0          1          1          1          1          1          1 
+          bd |         0          0          0   .0159482   .1709261   .3365308   .4728776   .5576155   .7077942 
+     cflcl1W | -1.163636  -1.163636  -.4027828   .0315205   .1246763   .1992902   .3017354   .3960514   .3960514 
+   tanglcl1W |  .0421256   .0421256   .0698456   .1440546   .2771763   .4965568   .7390909   .8447773   .8447773 
+     nwlcl1W | -.0567124  -.0567124   .1171495   .2908067   .4519239   .6239845   .7577031   .8216346   .8216346 
+     asslcl1 |      .551      2.949      6.303     22.206    102.461    555.244     2319.6   5916.369      25284 
+     mblcl1W |  .6657911   .6657911   .8154576   1.051237   1.538744   2.914916   7.520574   14.77255   14.77255 
+ q_salesvarW |  .0128551   .0128551   .0160298   .0242782   .0327869   .0467815   .0838582   .1081078   .1081078 
+      cfvarW |         0          0   .0059022   .0193238    .048261   .1248252   .2943947   .5063019   .5063019 
+          sp |         0          0          0          0          1          1          1          1          1 
+         otc |         0          0          0          0          0          0          1          1          1 
+         age |         1          2          2          5         10         21         34         36         40 
+
+. eststo
+(est1 stored)
+
+. 
+end of do-file
+
+. do "C:\Users\SUQIKE~1\AppData\Local\Temp\STD64b0_000000.tmp"
+
+. *** random sample
+. * generate descriptive variables
+. gen ra_line = line/at if randomsample==1
+(26,539 missing values generated)
+
+. gen ra_lineun = lineun/at if randomsample==1
+(26,539 missing values generated)
+
+. gen ra_linetot = linetot/at if randomsample==1
+(26,539 missing values generated)
+
+. gen liq_linetot = linetot/(linetot+che) if randomsample==1
+(26,539 missing values generated)
+
+. gen liq_lineun = lineun/(lineun+che) if randomsample==1
+(26,541 missing values generated)
+
+. 
+. 
+. eststo clear
+
+. estpost sum lineofcredit_rs ra_linetot ra_lineun ra_line liq_linetot liq_lineun def bd cflcl1W tanglcl1W nwlcl1W asslcl1 mblcl1W
+>  q_salesvarW cfvarW sp otc age if randomsample==1, d
+
+             |  e(count)   e(sum_w)    e(mean)     e(Var)      e(sd)  e(skewn~)  e(kurto~)     e(sum)     e(min)     e(max) 
+-------------+--------------------------------------------------------------------------------------------------------------
+lineofcred~s |      1908       1908   .7484277   .1883824   .4340304  -1.145048   2.311134       1428          0          1 
+  ra_linetot |      1908       1908   .1589078   .0284961    .168808   1.677704   7.720336   303.1961          0    1.42002 
+   ra_lineun |      1908       1908   .1020528   .0155338   .1246345   2.564617   14.82182   194.7167          0   1.327842 
+     ra_line |      1908       1908    .056855   .0094691   .0973093   2.433973   10.50605   108.4793          0   .8144747 
+ liq_linetot |      1908       1908   .5117739   .1502305   .3875958  -.1923369    1.40097   976.4647          0          1 
+  liq_lineun |      1906       1906   .4497054   .1392781   .3731998   .0313897     1.4078   857.1385          0          1 
+         def |      1908       1908   .0796646   .0733566   .2708442   3.104705   10.63919        152          0          1 
+          bd |      1908       1908   .2047467   .0383683   .1958783   .7287796   2.692975   390.6567          0   .8348912 
+     cflcl1W |      1908       1908    .033982   .1247694   .3532271  -2.272041    7.77983   64.83762  -1.163636   .3960514 
+   tanglcl1W |      1908       1908   .3302369   .0508714   .2255468     .77373   2.627079    630.092   .0421256   .8447773 
+     nwlcl1W |      1908       1908   .4566697   .0539543   .2322807  -.3094597   2.419644   871.3258  -.0567124   .8216346 
+     asslcl1 |      1908       1908   1441.409   5.90e+07   7682.261   16.24859   327.8105    2750208       .039     167825 
+     mblcl1W |      1908       1908   2.825083   11.54755   3.398169   2.508584   8.527358   5390.258   .6657911   14.77255 
+ q_salesvarW |      1908       1908    .043248   .0007192   .0268171   1.210242   3.523353   82.51726   .0128551   .1081078 
+      cfvarW |      1908       1908   .1020648   .0172078   .1311784   1.898418   5.823022   194.7397          0   .5063019 
+          sp |      1908       1908   .6006289   .2399996   .4898975  -.4109239   1.168858       1146          0          1 
+         otc |      1908       1908   .2080713    .164864   .4060345   1.438327   3.068785        397          0          1 
+         age |      1908       1908   13.71384   130.2746   11.41379   .8338512   2.389749      26166          1         43 
+
+             |     e(p1)      e(p5)     e(p10)     e(p25)     e(p50)     e(p75)     e(p90)     e(p95)     e(p99) 
+-------------+---------------------------------------------------------------------------------------------------
+lineofcred~s |         0          0          0          0          1          1          1          1          1 
+  ra_linetot |         0          0          0          0   .1121153   .2438424   .3809955   .4748338   .6727301 
+   ra_lineun |         0          0          0          0   .0690535   .1498274   .2525597   .3250248   .5808053 
+     ra_line |         0          0          0          0          0   .0820619   .1892561   .2613488   .4439012 
+ liq_linetot |         0          0          0          0   .5691547   .8996476   .9697139   .9862614   .9975445 
+  liq_lineun |         0          0          0          0   .4549141   .8215859   .9431778   .9740492   .9953694 
+         def |         0          0          0          0          0          0          0          1          1 
+          bd |         0          0          0   .0103482   .1693865   .3437003    .483703   .5746664   .7411951 
+     cflcl1W | -1.163636   -1.08601  -.3710638   .0399025   .1260172   .1979623   .3260401   .3960514   .3960514 
+   tanglcl1W |  .0421256    .053172   .0823989    .145852   .2741947   .4801593    .680886   .8172955   .8447773 
+     nwlcl1W | -.0567124   .0041431   .1486582   .2968669    .468128   .6429245   .7747763   .8216346   .8216346 
+     asslcl1 |      .478      2.903      6.929    23.9815    116.411    522.201   2277.513     5663.8   22500.07 
+     mblcl1W |  .6657911   .6657911   .8052566   1.036337   1.505989   2.729096   6.504492   12.99976   14.77255 
+ q_salesvarW |  .0128551   .0128551   .0159308   .0243216   .0363314   .0502239   .0927987   .1081078   .1081078 
+      cfvarW |         0          0   .0047359   .0191695    .048726   .1268583    .292636   .4939013   .5063019 
+          sp |         0          0          0          0          1          1          1          1          1 
+         otc |         0          0          0          0          0          0          1          1          1 
+         age |         1          2          2          4          9         21         33         36         40 
+
+. eststo
+(est1 stored)
+
+. 
+end of do-file
+
+. do "C:\Users\SUQIKE~1\AppData\Local\Temp\STD64b0_000000.tmp"
+
+. *********************************** Table 3 *********************************
+. gen sic1 = substr(sic,1,1)
+
+. gen lasslcl1 = ln(asslcl1)
+
+. gen lfirmage = ln(age)
+(2 missing values generated)
+
+. winsor(lasslcl1), generate(lasslcl1W) p(0.05)
+
+. 
+. *** create year fix effect
+. forvalues i=1997/2003{
+  2.         gen yd`i' = (fy==`i')
+  3. }
+
+. 
+. * Col 1
+. eststo clear
+
+. xi: dprobit lineofcredit yd* i.sic1 cflcl1W tanglcl1W lasslcl1W nwlcl1W mblcl1W q_salesvar cfvar sp otc lfirmage, cluster(gvkey)
+i.sic1            _Isic1_1-10         (_Isic1_1 for sic1==0 omitted)
+
+Iteration 0:   log pseudolikelihood = -13541.159
+Iteration 1:   log pseudolikelihood = -10950.997
+Iteration 2:   log pseudolikelihood = -10863.604
+Iteration 3:   log pseudolikelihood = -10854.843
+Iteration 4:   log pseudolikelihood = -10854.822
+
+Probit regression, reporting marginal effects           Number of obs =  28445
+                                                        Wald chi2(26) =1516.20
+                                                        Prob > chi2   = 0.0000
+Log pseudolikelihood = -10854.822                       Pseudo R2     = 0.1984
+
+                              (Std. err. adjusted for 4,503 clusters in gvkey)
+------------------------------------------------------------------------------
+         |               Robust
+lineof~t |      dF/dx   Std. err.      z    P>|z|     x-bar  [    95% C.I.   ]
+---------+--------------------------------------------------------------------
+  yd1997*|   .0170783   .0053767     3.06   0.002    .11981    .00654  .027616
+  yd1998*|   .0124475   .0064127     1.89   0.059   .129021  -.000121  .025016
+  yd1999*|   .0046894   .0074907     0.62   0.535    .13556  -.009992  .019371
+  yd2000*|   .0119136   .0081022     1.44   0.151   .132923  -.003966  .027794
+  yd2001*|  -.0143888   .0092263    -1.60   0.110   .131622  -.032472  .003694
+  yd2002*|    -.02344   .0100757    -2.42   0.016   .126455  -.043188 -.003692
+  yd2003*|  -.0376185   .0108001    -3.70   0.000   .120654  -.058786 -.016451
+_Isic1_2*|   .1090336   .0328336     2.10   0.036   .061311   .044681  .173386
+_Isic1_3*|   .1130792   .0446685     1.95   0.051   .181016   .025531  .200628
+_Isic1_4*|   .1448704   .0541435     2.31   0.021   .319107   .038751   .25099
+_Isic1_5*|    .112134   .0344247     2.13   0.033   .085991   .044663  .179605
+_Isic1_6*|   .1221304   .0339947     2.34   0.019   .112814   .055502  .188759
+_Isic1_7*|   .0716741   .0483139     1.13   0.258   .010722  -.023019  .166368
+_Isic1_8*|   .0969865   .0472152     1.63   0.103   .163403   .004446  .189527
+_Isic1_9*|   .1185298   .0265637     2.47   0.014   .048796   .066466  .170594
+_Isic~10*|    .101077   .0315441     1.93   0.053   .013605   .039252  .162902
+ cflcl1W |   .1100376   .0107637    10.28   0.000   .026077   .088941  .131134
+tangl~1W |   .0186847   .0186193     1.00   0.316   .339504  -.017808  .055178
+lassl~1W |   .0426955   .0032387    12.94   0.000   4.72987   .036348  .049043
+ nwlcl1W |  -.1029628   .0164644    -6.30   0.000    .44299  -.135232 -.070693
+ mblcl1W |  -.0127525   .0010821   -12.50   0.000   2.97918  -.014873 -.010632
+q_sale~r |    .781449   .2096889     3.67   0.000   .043041   .370466  1.19243
+   cfvar |  -.0288381    .011175    -2.60   0.009   .149773  -.050741 -.006935
+      sp*|   .0392824    .012746     3.14   0.002    .62032   .014301  .064264
+     otc*|  -.0182322   .0108969    -1.72   0.086   .185059   -.03959  .003125
+lfirmage |  -.0046444   .0044253    -1.05   0.293   2.22717  -.013318  .004029
+---------+--------------------------------------------------------------------
+  obs. P |   .8169098
+ pred. P |   .8584989  (at x-bar)
+------------------------------------------------------------------------------
+(*) dF/dx is for discrete change of dummy variable from 0 to 1
+    z and P>|z| correspond to the test of the underlying coefficient being 0
+
+. eststo
+(est1 stored)
+
+. 
+. * Col 2
+. xi: dprobit lineofcredit_rs yd* i.sic1 cflcl1W tanglcl1W lasslcl1W nwlcl1W mblcl1W q_salesvar cfvar sp otc lfirmage if randomsam
+> ple==1, cluster(gvkey)
+i.sic1            _Isic1_1-10         (_Isic1_1 for sic1==0 omitted)
+
+note: _Isic1_7 omitted because of collinearity.
+Iteration 0:   log pseudolikelihood = -1076.2187
+Iteration 1:   log pseudolikelihood = -797.28508
+Iteration 2:   log pseudolikelihood = -778.68067
+Iteration 3:   log pseudolikelihood = -777.78541
+Iteration 4:   log pseudolikelihood = -777.71547
+Iteration 5:   log pseudolikelihood = -777.69511
+Iteration 6:   log pseudolikelihood = -777.68874
+Iteration 7:   log pseudolikelihood =  -777.6867
+Iteration 8:   log pseudolikelihood = -777.68603
+Iteration 9:   log pseudolikelihood =  -777.6858
+Iteration 10:  log pseudolikelihood = -777.68573
+Iteration 11:  log pseudolikelihood =  -777.6857
+Iteration 12:  log pseudolikelihood = -777.68569
+Iteration 13:  log pseudolikelihood = -777.68569
+Iteration 14:  log pseudolikelihood = -777.68569
+Iteration 15:  log pseudolikelihood = -777.68569
+Iteration 16:  log pseudolikelihood = -777.68569
+Iteration 17:  log pseudolikelihood = -777.68569
+Iteration 18:  log pseudolikelihood = -777.68569
+Iteration 19:  log pseudolikelihood = -777.68569
+Iteration 20:  log pseudolikelihood = -777.68569
+
+Probit regression, reporting marginal effects           Number of obs =   1908
+                                                        Wald chi2(23) =      .
+                                                        Prob > chi2   =      .
+Log pseudolikelihood = -777.68569                       Pseudo R2     = 0.2774
+
+                                (Std. err. adjusted for 300 clusters in gvkey)
+------------------------------------------------------------------------------
+         |               Robust
+lineof~s |      dF/dx   Std. err.      z    P>|z|     x-bar  [    95% C.I.   ]
+---------+--------------------------------------------------------------------
+  yd1997*|   .0115894   .0283067     0.40   0.688   .124214  -.043891   .06707
+  yd1998*|    .000925   .0301342     0.03   0.976   .130503  -.058137  .059987
+  yd1999*|  -.0009431   .0313295    -0.03   0.976   .137317  -.062348  .060462
+  yd2000*|   .0412014   .0330308     1.17   0.241     .1326  -.023538  .105941
+  yd2001*|  -.0312712   .0396889    -0.82   0.412   .129979   -.10906  .046518
+  yd2002*|  -.0187177    .041617    -0.46   0.645    .12631  -.100286   .06285
+  yd2003*|  -.0798113   .0479862    -1.82   0.069   .116352  -.173863   .01424
+_Isic1_2*|   -.865355   .0160427   -12.97   0.000   .038784  -.896798 -.833912
+_Isic1_3*|  -.9571007   .0068542   -23.51   0.000   .159853  -.970535 -.943667
+_Isic1_4*|   -.988991   .0037483   -23.52   0.000   .336478  -.996338 -.981644
+_Isic1_5*|  -.9041623   .0119983   -11.86   0.000   .082809  -.927678 -.880646
+_Isic1_6*|  -.9486774   .0081755   -17.91   0.000   .143082  -.964701 -.932654
+_Isic1_8*|    -.95339   .0074706   -23.81   0.000   .140985  -.968032 -.938748
+_Isic1_9*|  -.9105169   .0118666   -20.60   0.000    .08543  -.933775 -.887259
+_Isic~10*|  -.8226513   .0191379        .       .   .002621  -.860161 -.785142
+ cflcl1W |    .094295   .0535226     1.76   0.079   .033982  -.010607  .199197
+tangl~1W |   .0806822   .0849173     0.95   0.342   .330237  -.085753  .247117
+lassl~1W |   .0438137   .0161503     2.75   0.006   4.78031    .01216  .075468
+ nwlcl1W |  -.0454069   .0737576    -0.61   0.539    .45667  -.189969  .099155
+ mblcl1W |  -.0224314   .0055577    -4.44   0.000   2.82508  -.033324 -.011538
+q_sale~r |   2.920398   .7733301     3.73   0.000   .044572    1.4047   4.4361
+   cfvar |   -.214735   .0887103    -2.49   0.013    .13099  -.388604 -.040866
+      sp*|   .0130696   .0576803     0.23   0.820   .600629  -.099982  .126121
+     otc*|  -.0895806   .0503723    -1.89   0.059   .208071  -.188308  .009147
+lfirmage |   -.014124   .0202507    -0.70   0.481   2.19801  -.053815  .025567
+---------+--------------------------------------------------------------------
+  obs. P |   .7484277
+ pred. P |   .8183947  (at x-bar)
+------------------------------------------------------------------------------
+(*) dF/dx is for discrete change of dummy variable from 0 to 1
+    z and P>|z| correspond to the test of the underlying coefficient being 0
+
+. eststo
+(est2 stored)
+
+. 
+. * Col 3
+. xi: regress liq_linetot yd* i.sic1 cflcl1W tanglcl1W lasslcl1W nwlcl1W mblcl1W q_salesvar cfvar sp otc lfirmage if randomsample=
+> =1, cluster(gvkey)
+i.sic1            _Isic1_1-10         (_Isic1_1 for sic1==0 omitted)
+note: _Isic1_7 omitted because of collinearity.
+
+Linear regression                               Number of obs     =      1,908
+                                                F(24, 299)        =          .
+                                                Prob > F          =          .
+                                                R-squared         =     0.3987
+                                                Root MSE          =     .30253
+
+                                (Std. err. adjusted for 300 clusters in gvkey)
+------------------------------------------------------------------------------
+             |               Robust
+ liq_linetot | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      yd1997 |   .0126681   .0179886     0.70   0.482    -.0227322    .0480685
+      yd1998 |    .032852   .0216018     1.52   0.129    -.0096588    .0753628
+      yd1999 |   .0266678   .0238791     1.12   0.265    -.0203245    .0736602
+      yd2000 |    .035295   .0265087     1.33   0.184    -.0168723    .0874623
+      yd2001 |  -.0470585   .0288533    -1.63   0.104    -.1038398    .0097229
+      yd2002 |  -.0585254   .0300729    -1.95   0.053    -.1177067    .0006559
+      yd2003 |  -.1188984   .0301263    -3.95   0.000    -.1781849    -.059612
+    _Isic1_2 |  -.1623035   .0945937    -1.72   0.087    -.3484573    .0238502
+    _Isic1_3 |  -.1753787   .0558518    -3.14   0.002    -.2852911   -.0654662
+    _Isic1_4 |  -.2219335   .0498286    -4.45   0.000    -.3199927   -.1238742
+    _Isic1_5 |  -.1587756   .0660765    -2.40   0.017    -.2888096   -.0287416
+    _Isic1_6 |  -.1708743    .051109    -3.34   0.001    -.2714531   -.0702954
+    _Isic1_7 |          0  (omitted)
+    _Isic1_8 |  -.3800329   .0582049    -6.53   0.000    -.4945762   -.2654897
+    _Isic1_9 |  -.1742642   .0665084    -2.62   0.009     -.305148   -.0433803
+   _Isic1_10 |  -.4185879   .0569826    -7.35   0.000    -.5307257   -.3064502
+     cflcl1W |   .0822144   .0407029     2.02   0.044     .0021139    .1623148
+   tanglcl1W |   .0417758   .0712798     0.59   0.558    -.0984978    .1820494
+   lasslcl1W |   .0574513   .0125223     4.59   0.000     .0328082    .0820943
+     nwlcl1W |  -.1257424   .0607071    -2.07   0.039    -.2452096   -.0062751
+     mblcl1W |  -.0304906   .0040282    -7.57   0.000    -.0384178   -.0225634
+  q_salesvar |   1.035667   .4743367     2.18   0.030     .1022055    1.969128
+       cfvar |  -.1588015   .0402384    -3.95   0.000    -.2379879   -.0796151
+          sp |   .0801109   .0452583     1.77   0.078    -.0089542    .1691761
+         otc |  -.0338487   .0384378    -0.88   0.379    -.1094916    .0417942
+    lfirmage |  -.0185109   .0159052    -1.16   0.245    -.0498113    .0127895
+       _cons |   .5676696   .1289665     4.40   0.000     .3138726    .8214665
+------------------------------------------------------------------------------
+
+. eststo
+(est3 stored)
+
+. 
+. * Col 4
+. xi: regress liq_linetot yd* i.sic1 cflcl1W tanglcl1W lasslcl1W nwlcl1W mblcl1W q_salesvar cfvar sp otc lfirmage if randomsample=
+> =1 & lineofcredit==1, cluster(gvkey)
+i.sic1            _Isic1_1-10         (_Isic1_1 for sic1==0 omitted)
+note: _Isic1_7 omitted because of collinearity.
+
+Linear regression                               Number of obs     =      1,554
+                                                F(24, 274)        =          .
+                                                Prob > F          =          .
+                                                R-squared         =     0.3313
+                                                Root MSE          =     .28452
+
+                                (Std. err. adjusted for 275 clusters in gvkey)
+------------------------------------------------------------------------------
+             |               Robust
+ liq_linetot | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      yd1997 |   .0161073   .0208327     0.77   0.440    -.0249051    .0571198
+      yd1998 |   .0373548   .0244912     1.53   0.128    -.0108602    .0855697
+      yd1999 |   .0366587    .027259     1.34   0.180     -.017005    .0903224
+      yd2000 |   .0423718   .0284887     1.49   0.138    -.0137127    .0984563
+      yd2001 |  -.0399038   .0312952    -1.28   0.203    -.1015135    .0217059
+      yd2002 |  -.0372414   .0320383    -1.16   0.246    -.1003138    .0258311
+      yd2003 |  -.1109861    .032308    -3.44   0.001    -.1745895   -.0473826
+    _Isic1_2 |  -.1134548   .0902381    -1.26   0.210    -.2911029    .0641932
+    _Isic1_3 |  -.1462513   .0501626    -2.92   0.004    -.2450043   -.0474982
+    _Isic1_4 |  -.1926054   .0460911    -4.18   0.000     -.283343   -.1018677
+    _Isic1_5 |  -.1185717   .0497822    -2.38   0.018     -.216576   -.0205674
+    _Isic1_6 |  -.1510584   .0447182    -3.38   0.001    -.2390934   -.0630235
+    _Isic1_7 |          0  (omitted)
+    _Isic1_8 |  -.3364206    .059073    -5.69   0.000    -.4527153   -.2201259
+    _Isic1_9 |  -.1568528   .0603753    -2.60   0.010    -.2757111   -.0379944
+   _Isic1_10 |   -.259411      .0496    -5.23   0.000    -.3570566   -.1617655
+     cflcl1W |   .1201116   .0571578     2.10   0.037     .0075874    .2326358
+   tanglcl1W |   .0052844   .0713546     0.07   0.941    -.1351886    .1457574
+   lasslcl1W |   .0377544   .0107841     3.50   0.001     .0165241    .0589847
+     nwlcl1W |  -.1611382   .0619837    -2.60   0.010     -.283163   -.0391134
+     mblcl1W |  -.0337599   .0050622    -6.67   0.000    -.0437257    -.023794
+  q_salesvar |   .5450257   .4420035     1.23   0.219    -.3251287     1.41518
+       cfvar |  -.2663767   .0899381    -2.96   0.003    -.4434342   -.0893192
+          sp |   .0515028   .0421412     1.22   0.223    -.0314589    .1344645
+         otc |  -.0046114   .0398214    -0.12   0.908    -.0830061    .0737833
+    lfirmage |  -.0127233   .0157291    -0.81   0.419    -.0436885     .018242
+       _cons |   .7433274   .1210836     6.14   0.000      .504955    .9816998
+------------------------------------------------------------------------------
+
+. eststo
+(est4 stored)
+
+. 
+. * Col 5
+. xi: regress liq_lineun yd* i.sic1 cflcl1W tanglcl1W lasslcl1W nwlcl1W mblcl1W q_salesvar cfvar sp otc lfirmage if randomsample==
+> 1, cluster(gvkey)
+i.sic1            _Isic1_1-10         (_Isic1_1 for sic1==0 omitted)
+note: _Isic1_7 omitted because of collinearity.
+
+Linear regression                               Number of obs     =      1,906
+                                                F(24, 299)        =          .
+                                                Prob > F          =          .
+                                                R-squared         =     0.3673
+                                                Root MSE          =     .29883
+
+                                (Std. err. adjusted for 300 clusters in gvkey)
+------------------------------------------------------------------------------
+             |               Robust
+  liq_lineun | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      yd1997 |   .0247985   .0169509     1.46   0.145    -.0085598    .0581567
+      yd1998 |   .0306839   .0211288     1.45   0.147     -.010896    .0722639
+      yd1999 |   .0070801   .0239248     0.30   0.767    -.0400022    .0541624
+      yd2000 |   .0023025   .0261834     0.09   0.930    -.0492246    .0538295
+      yd2001 |  -.0407316   .0273276    -1.49   0.137    -.0945104    .0130473
+      yd2002 |  -.0577704   .0287898    -2.01   0.046    -.1144267   -.0011141
+      yd2003 |  -.0938001   .0295194    -3.18   0.002    -.1518922   -.0357081
+    _Isic1_2 |  -.1022237   .1196652    -0.85   0.394    -.3377165     .133269
+    _Isic1_3 |  -.0843338    .100817    -0.84   0.404    -.2827346     .114067
+    _Isic1_4 |  -.1303362   .0975906    -1.34   0.183    -.3223876    .0617151
+    _Isic1_5 |  -.0928396   .1109019    -0.84   0.403    -.3110868    .1254075
+    _Isic1_6 |  -.1092722   .0972815    -1.12   0.262    -.3007153    .0821709
+    _Isic1_7 |          0  (omitted)
+    _Isic1_8 |  -.2795399   .1021222    -2.74   0.007    -.4805093   -.0785706
+    _Isic1_9 |  -.0923988   .1068011    -0.87   0.388    -.3025758    .1177782
+   _Isic1_10 |   -.215366   .1014693    -2.12   0.035    -.4150505   -.0156815
+     cflcl1W |   .0767439   .0376663     2.04   0.042     .0026192    .1508686
+   tanglcl1W |   .0344476   .0677799     0.51   0.612    -.0989384    .1678336
+   lasslcl1W |   .0594609   .0120014     4.95   0.000     .0358429    .0830788
+     nwlcl1W |  -.0686134   .0560663    -1.22   0.222    -.1789479    .0417211
+     mblcl1W |  -.0250762    .003873    -6.47   0.000     -.032698   -.0174544
+  q_salesvar |    1.14957    .485854     2.37   0.019     .1934436    2.105696
+       cfvar |  -.1121309   .0358166    -3.13   0.002    -.1826154   -.0416464
+          sp |   .0485206   .0443887     1.09   0.275    -.0388332    .1358744
+         otc |  -.0527634   .0366445    -1.44   0.151    -.1248772    .0193505
+    lfirmage |  -.0115252   .0154538    -0.75   0.456    -.0419372    .0188868
+       _cons |   .3722134   .1529417     2.43   0.016     .0712348     .673192
+------------------------------------------------------------------------------
+
+. eststo
+(est5 stored)
+
+. 
+. * Col 6
+. xi: regress liq_lineun yd* i.sic1 cflcl1W tanglcl1W lasslcl1W nwlcl1W mblcl1W q_salesvar cfvar sp otc lfirmage if randomsample==
+> 1 & lineofcredit==1, cluster(gvkey)
+i.sic1            _Isic1_1-10         (_Isic1_1 for sic1==0 omitted)
+note: _Isic1_7 omitted because of collinearity.
+
+Linear regression                               Number of obs     =      1,552
+                                                F(24, 274)        =          .
+                                                Prob > F          =          .
+                                                R-squared         =     0.2967
+                                                Root MSE          =     .29241
+
+                                (Std. err. adjusted for 275 clusters in gvkey)
+------------------------------------------------------------------------------
+             |               Robust
+  liq_lineun | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+      yd1997 |   .0284489   .0200781     1.42   0.158    -.0110781    .0679759
+      yd1998 |   .0343187   .0241627     1.42   0.157    -.0132494    .0818868
+      yd1999 |   .0139258   .0265174     0.53   0.600    -.0382779    .0661295
+      yd2000 |   .0060826   .0291858     0.21   0.835    -.0513744    .0635396
+      yd2001 |  -.0361353    .030222    -1.20   0.233    -.0956321    .0233614
+      yd2002 |  -.0408416   .0314963    -1.30   0.196     -.102847    .0211639
+      yd2003 |   -.083733   .0323523    -2.59   0.010    -.1474237   -.0200423
+    _Isic1_2 |  -.0665472   .1182253    -0.56   0.574    -.2992926    .1661981
+    _Isic1_3 |  -.0587964   .0962206    -0.61   0.542     -.248222    .1306292
+    _Isic1_4 |  -.1101267   .0934077    -1.18   0.239    -.2940147    .0737613
+    _Isic1_5 |  -.0596317    .101298    -0.59   0.557    -.2590529    .1397894
+    _Isic1_6 |  -.1045353   .0924077    -1.13   0.259    -.2864546    .0773841
+    _Isic1_7 |          0  (omitted)
+    _Isic1_8 |  -.2461619   .1009547    -2.44   0.015    -.4449073   -.0474166
+    _Isic1_9 |  -.0882468   .1012821    -0.87   0.384    -.2876369    .1111432
+   _Isic1_10 |  -.0390332   .0966855    -0.40   0.687    -.2293741    .1513076
+     cflcl1W |   .1399083   .0547761     2.55   0.011     .0320729    .2477438
+   tanglcl1W |  -.0011805   .0734755    -0.02   0.987    -.1458288    .1434677
+   lasslcl1W |    .047272    .010907     4.33   0.000     .0257999    .0687441
+     nwlcl1W |  -.0804235   .0593521    -1.36   0.177    -.1972676    .0364206
+     mblcl1W |  -.0271313    .005133    -5.29   0.000    -.0372364   -.0170262
+  q_salesvar |    .708703   .4717664     1.50   0.134    -.2200445    1.637451
+       cfvar |  -.1830274    .082365    -2.22   0.027    -.3451761   -.0208786
+          sp |   .0281822   .0420969     0.67   0.504    -.0546923    .1110567
+         otc |   -.035616   .0402268    -0.89   0.377    -.1148088    .0435769
+    lfirmage |   -.007238   .0156093    -0.46   0.643    -.0379674    .0234914
+       _cons |    .491938   .1495573     3.29   0.001     .1975105    .7863654
+------------------------------------------------------------------------------
+
+. eststo
+(est6 stored)
+
+. 
+end of do-file
+
+. do "C:\Users\SUQIKE~1\AppData\Local\Temp\STD64b0_000000.tmp"
+
+. ********************************** Figure 1 **********************************
+. * generate the decile variable for cash flow
+. egen cfcat = xtile(cflcl1), nq(10)
+
+. gen cashat = che/at
+
+. label variable cashat "cash-to-asset ratio"
+
+. 
+. 
+end of do-file
+
+. preserve
+
+. do "C:\Users\SUQIKE~1\AppData\Local\Temp\STD64b0_000000.tmp"
+
+. import excel figure1.xlsx, firstrow clear
+(3 vars, 12 obs)
+
+. 
+end of do-file
+
+. restore
+
+. do "C:\Users\SUQIKE~1\AppData\Local\Temp\STD64b0_000000.tmp"
+
+. import excel figure1.xlsx, firstrow clear
+(3 vars, 10 obs)
+
+. ren (Haslineofcreditfullsample cashtoassetratio) (lineofcredit cashat)
+
+. destring cfcat, replace
+cfcat: all characters numeric; replaced as byte
+
+. 
+. #delimit ;
+delimiter now ;
+. twoway (connected cashat cfcat, mcolor(black) msymbol(lgx) lcolor(black) lpattern(tight_dot)) 
+> (connected lineofcredit cfcat, yaxis(2) mcolor(black) msymbol(square) lcolor(blue) lpattern(solid)), 
+> ytitle("{bf:Cash/assets}", axis(1) size(small)) ylabel(0(0.1)0.6, format(%9.1f) grid glcolor(black) axis(1) labsize(small)) ysca
+> le(range(0 (0.1) 0.6) axis(1))
+> ytitle("{bf:Fraction with line of credit}", axis(2) size(small)) ylabel(0(0.1)1, format(%9.1f) nogrid axis(2) labsize(small)) ys
+> cale(range(0 (0.1) 1) axis(2))
+> xtitle("{bf: Deciles of EBITDA/(assets-cash)}", size(small)) xlabel(1(1)10, nogrid) 
+> legend(size(*0.7) order(1 "average cash/assets (left axis)" 2 "Fraction with line of credit (right axis)") position(6)) plotregi
+> on(lcolor(black));
+
+. #delimit cr
+delimiter now cr
+. 
+end of do-file
+
+. do "C:\Users\SUQIKE~1\AppData\Local\Temp\STD64b0_000000.tmp"
+
+. log close
+      name:  <unnamed>
+       log:  D:\Documents\study\MSyear1\Empirical Corp Fin\Assignment 1\bankline.log
+  log type:  text
+ closed on:   6 Feb 2024, 06:14:12
+----------------------------------------------------------------------------------------------------------------------------------

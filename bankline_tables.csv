@@ -1,0 +1,21 @@
+Full sample,,,,,Random sample,,,
+,,,,,,,,
+,Mean,SD,p50,,,Mean,SD,p50
+"Has line of credit [0,1]",0.817,0.387,1.000,,"Has line of credit [0, 1]",0.748,0.434,1.000
+,,,,,Total line of credit/assets,0.159,0.169,0.112
+,,,,,Unused line of credit/assets,0.102,0.125,0.069
+,,,,,Used line of credit/assets,0.057,0.097,0.000
+,,,,,Total line/(total line + cash),0.512,0.388,0.569
+,,,,,Unused line/(unused line + cash),0.450,0.373,0.455
+,,,,,"Violation of financial covenant {0, 1}",0.080,0.271,0.000
+Book debt/assets,0.204,0.190,0.171,,Book debt/assets,0.205,0.196,0.169
+EBITDA/(assets - cash),0.026,0.358,0.125,,EBITDA/(assets - cash),0.034,0.353,0.126
+Tangible assets/(assets - cash),0.340,0.239,0.277,,Tangible assets/(assets - cash),0.330,0.226,0.274
+"Net worth, cash adjusted",0.443,0.235,0.452,,"Net worth,  cash adjusted",0.457,0.232,0.468
+Assets - cash,1608.557,10672.165,102.461,,Assets - cash,1441.409,7682.261,116.411
+"Market-to-book,  cash adjusted",2.979,3.543,1.539,,"Market-to-book,  cash adjusted",2.825,3.398,1.506
+Industry sales volatility,0.041,0.025,0.033,,Industry sales volatility,0.043,0.027,0.036
+Cash-flow volatility,0.102,0.132,0.048,,Cash-flow volatility,0.102,0.131,0.049
+"Not in an S&P index {0, 1}",0.620,0.485,1.000,,"Not in an S&P index {0, 1}",0.601,0.490,1.000
+"Traded over the counter {0, 1}",0.185,0.388,0.000,,"Traded over the counter {0, 1}",0.208,0.406,0.000
+Firm age (years since IPO),13.991,11.439,10.000,,Firm age (years since IPO),13.714,11.414,9.000
